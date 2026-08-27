@@ -1,0 +1,1067 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quant Desk Live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F3F4F8; --surface:#FFFFFF; --surface-raised:#FBFBFE;
+    --border:#E1E3EC; --border-soft:#EAECF3;
+    --text:#14161F; --text-dim:#5B6072; --text-faint:#8A8FA3;
+    --accent:#9A6600; --accent-soft:rgba(154,102,0,0.12);
+    --up:#0E8F52; --up-soft:rgba(14,143,82,0.11);
+    --down:#C22E45; --down-soft:rgba(194,46,69,0.11);
+    --twoway:#3457C7; --twoway-soft:rgba(52,87,199,0.11);
+    --shadow:0 1px 2px rgba(20,22,31,0.04), 0 8px 24px -12px rgba(20,22,31,0.10);
+    --radius:10px;
+    font-variant-numeric: tabular-nums;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0A0C12; --surface:#12141C; --surface-raised:#171A24;
+      --border:#262A38; --border-soft:#1E212C;
+      --text:#E9EAF2; --text-dim:#9599AC; --text-faint:#666B80;
+      --accent:#E3A63C; --accent-soft:rgba(227,166,60,0.14);
+      --up:#3FCB84; --up-soft:rgba(63,203,132,0.13);
+      --down:#F1596E; --down-soft:rgba(241,89,110,0.13);
+      --twoway:#7B9AFF; --twoway-soft:rgba(123,154,255,0.14);
+      --shadow:0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0A0C12; --surface:#12141C; --surface-raised:#171A24;
+    --border:#262A38; --border-soft:#1E212C;
+    --text:#E9EAF2; --text-dim:#9599AC; --text-faint:#666B80;
+    --accent:#E3A63C; --accent-soft:rgba(227,166,60,0.14);
+    --up:#3FCB84; --up-soft:rgba(63,203,132,0.13);
+    --down:#F1596E; --down-soft:rgba(241,89,110,0.13);
+    --twoway:#7B9AFF; --twoway-soft:rgba(123,154,255,0.14);
+    --shadow:0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:"IBM Plex Sans",-apple-system,Segoe UI,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1400px;margin:0 auto;padding:20px 20px 64px;}
+  h1,h2,h3,h4{font-family:"Barlow Condensed",sans-serif;font-weight:700;letter-spacing:0.01em;margin:0;}
+  a{color:inherit;}
+
+  .masthead{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;padding-bottom:16px;margin-bottom:16px;border-bottom:1px solid var(--border);}
+  .brand{display:flex;flex-direction:column;gap:2px;}
+  .brand .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--accent);font-weight:600;}
+  .brand h1{font-size:34px;line-height:1;}
+  .brand .sub{color:var(--text-dim);font-size:13.5px;margin-top:4px;}
+  .statuscol{display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
+  .feedchips{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+  .feedchip{display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono";font-size:11px;padding:4px 10px;border-radius:100px;border:1px solid var(--border);color:var(--text-dim);background:var(--surface);}
+  .feeddot{width:7px;height:7px;border-radius:50%;background:var(--text-faint);}
+  .feeddot.live{background:var(--up);box-shadow:0 0 0 3px var(--up-soft);}
+  .feeddot.reconnecting{background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+  .feeddot.error,.feeddot.notconfigured{background:var(--down);box-shadow:0 0 0 3px var(--down-soft);}
+  .uptime{font-family:"IBM Plex Mono";font-size:11px;color:var(--text-faint);}
+
+  .section-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:32px 0 12px;flex-wrap:wrap;}
+  .section-head h2{font-size:24px;}
+  .section-head .note{font-size:12.5px;color:var(--text-faint);font-family:"IBM Plex Mono",monospace;}
+
+  table{width:100%;border-collapse:collapse;}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}
+  .panel-scroll{overflow-x:auto;}
+  th{text-align:left;font-size:10.5px;letter-spacing:0.07em;text-transform:uppercase;color:var(--text-faint);font-weight:600;padding:10px 12px;background:var(--surface-raised);border-bottom:1px solid var(--border);white-space:nowrap;}
+  td{padding:10px 12px;border-bottom:1px solid var(--border-soft);font-size:13px;vertical-align:middle;white-space:nowrap;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr.row:hover{background:var(--surface-raised);cursor:pointer;}
+  tbody tr.row.expanded{background:var(--surface-raised);}
+  .num{font-family:"IBM Plex Mono";text-align:right;}
+  .sym{font-weight:600;}
+  .caret{display:inline-block;width:11px;color:var(--text-faint);font-size:10px;}
+  .cls{font-size:10.5px;color:var(--text-faint);text-transform:uppercase;font-family:"IBM Plex Mono";margin-left:6px;}
+  .tier{font-size:9.5px;text-transform:uppercase;font-family:"IBM Plex Mono";padding:1px 5px;border-radius:4px;margin-left:6px;letter-spacing:0.04em;border:1px solid var(--border);color:var(--text-faint);}
+  .tier.discovered{color:var(--accent);border-color:var(--accent-soft);background:var(--accent-soft);}
+  .rank{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:var(--surface-raised);border:1px solid var(--border);font-family:"IBM Plex Mono";font-size:11px;font-weight:600;color:var(--text-dim);}
+  .up-txt{color:var(--up);} .down-txt{color:var(--down);}
+  .price{font-family:"IBM Plex Mono";font-weight:600;transition:background-color .25s ease;border-radius:4px;padding:1px 5px;margin:-1px -5px;}
+  .price.flash-up{background:var(--up-soft);color:var(--up);}
+  .price.flash-down{background:var(--down-soft);color:var(--down);}
+  .chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:100px;font-size:11px;font-weight:600;white-space:nowrap;}
+  .chip.up{background:var(--up-soft);color:var(--up);}
+  .chip.down{background:var(--down-soft);color:var(--down);}
+  .chip.twoway{background:var(--twoway-soft);color:var(--twoway);}
+  .mtf-pill{font-family:"IBM Plex Mono";font-size:10.5px;color:var(--text-dim);}
+  .heatbar{width:70px;height:5px;border-radius:4px;background:var(--border-soft);overflow:hidden;display:inline-block;vertical-align:middle;margin-right:6px;}
+  .heatfill{height:100%;background:var(--accent);}
+  .tags{display:flex;flex-wrap:wrap;gap:4px;max-width:260px;white-space:normal;}
+  .tag{font-size:10.5px;color:var(--text-dim);background:var(--surface-raised);border:1px solid var(--border-soft);padding:1.5px 7px;border-radius:5px;}
+  .rsi-hot{color:var(--accent);font-weight:600;}
+  canvas.spark{display:block;}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:6px;}
+  @media (max-width:900px){.grid2{grid-template-columns:1fr;}}
+  .panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 16px;border-bottom:1px solid var(--border);}
+  .panel-head h3{font-size:19px;}
+  .panel-head .count{font-family:"IBM Plex Mono";font-size:11px;color:var(--text-faint);border:1px solid var(--border);padding:2px 8px;border-radius:100px;}
+
+  /* --- expandable per-pair deep-dive --- */
+  .detail-row td{background:var(--bg);padding:0;border-bottom:1px solid var(--border);}
+  .detail{padding:16px 20px 20px;}
+  .detail-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:20px;}
+  @media (max-width:1100px){.detail-grid{grid-template-columns:1fr;}}
+  .detail h4{font-size:15px;margin-bottom:8px;color:var(--text-dim);}
+  .mtf-table{width:100%;border-collapse:collapse;font-size:12px;}
+  .mtf-table th{padding:5px 8px;font-size:9.5px;background:transparent;border-bottom:1px solid var(--border);}
+  .mtf-table td{padding:5px 8px;border-bottom:1px solid var(--border-soft);font-family:"IBM Plex Mono";font-size:11.5px;}
+  .mtf-table td.tf-label{font-family:"IBM Plex Sans";font-weight:600;color:var(--text-dim);}
+  .subgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;}
+  @media (max-width:520px){.subgrid{grid-template-columns:1fr;}}
+  .levelrow{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;font-family:"IBM Plex Mono";}
+  .levelrow .touches{color:var(--text-faint);font-family:"IBM Plex Sans";font-size:10.5px;}
+  .fib-row{display:flex;justify-content:space-between;font-size:11.5px;padding:2px 0;font-family:"IBM Plex Mono";color:var(--text-dim);}
+  .confluence-line{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+  .divergence-note{font-size:12px;color:var(--text-dim);background:var(--surface);border:1px solid var(--border-soft);border-radius:8px;padding:8px 11px;margin-top:4px;}
+  .empty-note{font-size:12px;color:var(--text-faint);}
+
+  .signal-panel{margin-top:18px;}
+  .signal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1px;background:var(--border-soft);}
+  .signal-card{background:var(--surface);padding:13px 15px;}
+  .signal-card .name{font-size:12.5px;font-weight:600;margin-bottom:8px;}
+  .signal-card .horizon{display:flex;justify-content:space-between;align-items:baseline;font-size:11.5px;padding:2px 0;}
+  .signal-card .horizon .h-label{color:var(--text-faint);font-family:"IBM Plex Mono";}
+  .signal-card .horizon .h-stat{font-family:"IBM Plex Mono";}
+  .signal-card .n-note{font-size:10px;color:var(--text-faint);margin-top:6px;}
+
+  /* --- position action buttons (watchlist rows) --- */
+  .trade-btns{display:flex;gap:4px;}
+  .trade-btn{font-family:"IBM Plex Mono";font-size:10.5px;font-weight:600;padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--text-dim);cursor:pointer;}
+  .trade-btn:hover{filter:brightness(0.97);}
+  .trade-btn.long{color:var(--up);border-color:var(--up-soft);}
+  .trade-btn.long:hover{background:var(--up-soft);}
+  .trade-btn.short{color:var(--down);border-color:var(--down-soft);}
+  .trade-btn.short:hover{background:var(--down-soft);}
+  .trade-btn:disabled{opacity:0.5;cursor:default;}
+
+  /* --- tracker positions --- */
+  .tracker-panel{margin-top:6px;}
+  .tracker-summary{display:flex;gap:22px;flex-wrap:wrap;padding:13px 16px;border-bottom:1px solid var(--border);}
+  .stat{display:flex;flex-direction:column;gap:2px;}
+  .stat .stat-label{font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-faint);font-family:"IBM Plex Mono";}
+  .stat .stat-value{font-family:"IBM Plex Mono";font-size:15px;font-weight:600;}
+  .add-position{display:flex;gap:8px;align-items:center;padding:13px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+  .add-position input{font-family:"IBM Plex Mono";font-size:12.5px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface-raised);color:var(--text);width:150px;text-transform:uppercase;}
+  .add-position input:focus{outline:2px solid var(--twoway-soft);outline-offset:1px;}
+  .add-position .trade-btn{font-size:11.5px;padding:6px 14px;}
+  .add-error{font-size:11.5px;color:var(--down);width:100%;}
+  .close-btn{font-family:"IBM Plex Mono";font-size:10.5px;font-weight:600;padding:3px 10px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--text-dim);cursor:pointer;}
+  .close-btn:hover{background:var(--surface-raised);}
+  .side-chip{font-family:"IBM Plex Mono";font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:100px;text-transform:uppercase;}
+  .side-chip.long{color:var(--up);background:var(--up-soft);}
+  .side-chip.short{color:var(--down);background:var(--down-soft);}
+
+  /* --- spotlight --- */
+  .spotlight-panel{margin-top:6px;}
+  .spotlight-head{display:flex;justify-content:space-between;align-items:baseline;padding:14px 16px 0;flex-wrap:wrap;gap:8px;}
+  .spotlight-symbol-line{display:flex;align-items:baseline;gap:10px;}
+  .spotlight-meta{font-family:"IBM Plex Mono";font-size:11px;color:var(--text-faint);}
+  .spotlight-headline{margin:12px 16px 0;padding:13px 15px;border-radius:8px;border:1px solid var(--border);background:var(--surface-raised);}
+  .spotlight-headline.bullish{border-color:var(--up-soft);background:var(--up-soft);}
+  .spotlight-headline.bearish{border-color:var(--down-soft);background:var(--down-soft);}
+  .spotlight-headline.two-sided{border-color:var(--twoway-soft);background:var(--twoway-soft);}
+  .spotlight-bias-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .spotlight-headline-text{font-size:13.5px;line-height:1.55;color:var(--text);margin-top:8px;}
+  .confidence-chip{font-family:"IBM Plex Mono";font-size:10.5px;font-weight:600;padding:3px 9px;border-radius:100px;border:1px solid var(--border);color:var(--text-dim);text-transform:uppercase;background:var(--surface);}
+  .confidence-chip.high{color:var(--accent);border-color:var(--accent-soft);background:var(--accent-soft);}
+  .caution-list{margin:10px 16px 0;font-size:12px;color:var(--down);background:var(--down-soft);border-radius:8px;padding:9px 12px;line-height:1.5;}
+  .tier-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:14px 16px 0;}
+  .tier-card{border:1px solid var(--border-soft);border-radius:8px;padding:10px 12px;background:var(--surface);}
+  .tier-card .tier-name{font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-faint);font-family:"IBM Plex Mono";margin-bottom:5px;}
+  .key-levels-row{display:flex;gap:24px;flex-wrap:wrap;margin:16px 16px 0;font-size:12.5px;}
+  .kl-item{display:flex;flex-direction:column;gap:3px;}
+  .kl-label{font-size:10px;text-transform:uppercase;color:var(--text-faint);font-family:"IBM Plex Mono";}
+  .kl-value{font-family:"IBM Plex Mono";font-weight:600;}
+  .spotlight-mtf-wrap{margin:16px 16px 16px;}
+
+  /* --- derivatives positioning --- */
+  .pos-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin:14px 16px 0;}
+  .pos-card{border:1px solid var(--border-soft);border-radius:8px;padding:11px 13px;background:var(--surface);}
+  .pos-card .pos-name{font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-faint);font-family:"IBM Plex Mono";margin-bottom:5px;}
+  .pos-card .pos-value{font-family:"IBM Plex Mono";font-size:15px;font-weight:600;margin-bottom:3px;}
+  .pos-card .pos-note{font-size:11.5px;color:var(--text-dim);line-height:1.45;}
+  .pos-read{margin:12px 16px 0;padding:11px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface-raised);font-size:12.5px;line-height:1.55;color:var(--text-dim);}
+  .pos-read.bullish{border-color:var(--up-soft);background:var(--up-soft);}
+  .pos-read.bearish{border-color:var(--down-soft);background:var(--down-soft);}
+  .pos-disagree{margin:10px 16px 0;padding:11px 14px;border-radius:8px;border:1px solid var(--accent-soft);background:var(--accent-soft);font-size:12.5px;line-height:1.55;color:var(--text);}
+  .liq-bar{display:flex;height:7px;border-radius:4px;overflow:hidden;background:var(--border-soft);margin:6px 0 4px;}
+  .liq-bar .liq-long{background:var(--down);} .liq-bar .liq-short{background:var(--up);}
+  .cascade-flag{font-family:"IBM Plex Mono";font-size:9.5px;text-transform:uppercase;padding:1px 6px;border-radius:4px;background:var(--down-soft);color:var(--down);margin-left:6px;letter-spacing:0.04em;}
+  .not-available{margin:14px 16px 0;font-size:12px;color:var(--text-faint);padding:11px 14px;border:1px dashed var(--border);border-radius:8px;}
+
+  /* --- cost model --- */
+  .cost-check{margin:12px 16px 0;padding:10px 14px;border-radius:8px;font-size:12.5px;line-height:1.5;border:1px solid var(--border);}
+  .cost-check.not-viable{border-color:var(--down-soft);background:var(--down-soft);color:var(--down);}
+  .cost-check.thin{border-color:var(--accent-soft);background:var(--accent-soft);}
+  .cost-check.adequate{border-color:var(--up-soft);background:var(--up-soft);}
+  .cost-strip{display:flex;gap:20px;flex-wrap:wrap;padding:11px 16px;border-bottom:1px solid var(--border);background:var(--surface-raised);font-size:11.5px;color:var(--text-dim);}
+  .cost-strip b{font-family:"IBM Plex Mono";color:var(--text);}
+
+  /* --- signal scorecard (forward test) --- */
+  .scorecard-row{display:grid;grid-template-columns:1.6fr repeat(4,1fr);gap:10px;padding:11px 16px;border-bottom:1px solid var(--border-soft);align-items:center;font-size:12.5px;}
+  .scorecard-row:last-child{border-bottom:none;}
+  .scorecard-head{font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-faint);font-family:"IBM Plex Mono";background:var(--surface-raised);border-bottom:1px solid var(--border);}
+  .scorecard-row .sc-label{font-weight:600;}
+  .scorecard-row .sc-n{font-family:"IBM Plex Mono";font-size:10.5px;color:var(--text-faint);}
+  .sc-val{font-family:"IBM Plex Mono";}
+  .sc-warn{font-size:11px;color:var(--down);padding:0 16px 11px;grid-column:1/-1;}
+  @media (max-width:760px){.scorecard-row{grid-template-columns:1fr 1fr;}}
+
+  .alerts-panel{margin-top:18px;}
+  .alert-row{display:flex;gap:12px;padding:9px 16px;border-bottom:1px solid var(--border-soft);font-size:12.5px;align-items:baseline;}
+  .alert-row:last-child{border-bottom:none;}
+  .alert-time{font-family:"IBM Plex Mono";font-size:11px;color:var(--text-faint);flex:0 0 60px;}
+  .alert-msg{color:var(--text-dim);}
+  .empty{padding:18px 16px;color:var(--text-faint);font-size:12.5px;text-align:center;}
+
+  footer{margin-top:36px;padding-top:18px;border-top:1px solid var(--border);}
+  .disclaimer{font-size:11.5px;color:var(--text-faint);line-height:1.6;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;}
+  .disclaimer b{color:var(--text-dim);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="masthead">
+    <div class="brand">
+      <div class="eyebrow">Quant Desk · Live Edition</div>
+      <h1>Real-Time Crypto Breakout Monitor</h1>
+      <div class="sub">Bybit spot market data (free public WebSocket, no account needed) — multi-timeframe technical analysis, WhatsApp alerts on new setups</div>
+    </div>
+    <div class="statuscol">
+      <div class="feedchips">
+        <span class="feedchip"><span class="feeddot" id="dot-socket"></span><span id="txt-socket">connecting…</span></span>
+        <span class="feedchip"><span class="feeddot" id="dot-bybit"></span>Bybit <span id="txt-bybit">—</span></span>
+        <span class="feedchip" id="market-chip" style="display:none"><span id="txt-market">—</span></span>
+        <span class="feedchip" id="scan-chip" style="display:none">market scan <span id="txt-scan">—</span></span>
+      </div>
+      <div class="uptime" id="uptime">uptime —</div>
+    </div>
+  </div>
+
+  <div class="section-head">
+    <h2>🔦 Spotlight</h2>
+    <div class="note">One symbol, ultra-frequent 1m-12h analysis, refreshed every 3 min — built for actively trading a single pair on low timeframes with leverage</div>
+  </div>
+  <div class="panel spotlight-panel">
+    <div class="add-position" id="spotlight-picker">
+      <input type="text" id="spotlight-symbol" placeholder="e.g. BTCUSDT" maxlength="20" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('spotlight-go').click();}">
+      <button class="trade-btn long" id="spotlight-go" onclick="setSpotlightFromInput(this)">🔦 Spotlight</button>
+      <button class="close-btn" id="spotlight-clear-btn" onclick="clearSpotlight(this)" style="display:none">Clear</button>
+      <span class="add-error" id="spotlight-error"></span>
+    </div>
+    <div id="spotlight-body">
+      <div class="empty">No Spotlight symbol selected — pick one above, or click 🔦 on any watchlist row.</div>
+    </div>
+  </div>
+
+  <div class="section-head">
+    <h2>Top Watchlist — Live</h2>
+    <div class="note">Ranked by heat score · click a row for the full multi-timeframe breakdown</div>
+  </div>
+  <div class="panel panel-scroll">
+    <table>
+      <thead><tr><th>#</th><th>Symbol</th><th class="num">Price</th><th class="num">24h</th><th class="num">7d</th><th class="num">RSI</th><th>MTF</th><th>Funding</th><th>Positioning</th><th>Direction</th><th>Likelihood</th><th>Why</th><th>Chart</th><th>Trade</th></tr></thead>
+      <tbody id="top-body"><tr><td class="empty" colspan="14">Waiting for first tick…</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="section-head">
+    <h2>Also Watching Today</h2>
+    <div class="note">Biggest movers discovered by scanning the wider market — same full analysis, one tier down on heat</div>
+  </div>
+  <div class="panel panel-scroll">
+    <table>
+      <thead><tr><th>#</th><th>Symbol</th><th class="num">Price</th><th class="num">24h</th><th class="num">7d</th><th class="num">RSI</th><th>MTF</th><th>Funding</th><th>Positioning</th><th>Direction</th><th>Likelihood</th><th>Why</th><th>Chart</th><th>Trade</th></tr></thead>
+      <tbody id="watch-body"><tr><td class="empty" colspan="14">Scanning the market…</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="section-head">
+    <h2>Tracker Positions</h2>
+    <div class="note">Fictional long/short positions, simulated against real live prices — nothing here ever touches a real exchange</div>
+  </div>
+  <div class="panel tracker-panel">
+    <div class="cost-strip" id="cost-strip"></div>
+    <div class="tracker-summary" id="tracker-summary">
+      <div class="stat"><span class="stat-label">Closed</span><span class="stat-value" id="stat-count">0</span></div>
+      <div class="stat"><span class="stat-label">Win rate (net)</span><span class="stat-value" id="stat-winrate">—</span></div>
+      <div class="stat"><span class="stat-label">Avg return (net)</span><span class="stat-value" id="stat-avg">—</span></div>
+      <div class="stat"><span class="stat-label">Gross win rate</span><span class="stat-value" id="stat-gross-winrate">—</span></div>
+      <div class="stat"><span class="stat-label">Best</span><span class="stat-value" id="stat-best">—</span></div>
+      <div class="stat"><span class="stat-label">Worst</span><span class="stat-value" id="stat-worst">—</span></div>
+    </div>
+    <div class="add-position">
+      <input type="text" id="add-symbol" placeholder="e.g. BTCUSDT" maxlength="20" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('add-long').click();}">
+      <button class="trade-btn long" id="add-long" onclick="openPositionFromInput('long', this)">+ Long</button>
+      <button class="trade-btn short" id="add-short" onclick="openPositionFromInput('short', this)">+ Short</button>
+      <span class="add-error" id="add-error"></span>
+    </div>
+    <div class="panel-scroll">
+      <table>
+        <thead><tr><th>Symbol</th><th>Side</th><th class="num">Entry</th><th class="num">Current</th><th class="num">P&amp;L gross</th><th class="num">P&amp;L net</th><th>Signal at entry</th><th>Open for</th><th></th></tr></thead>
+        <tbody id="open-positions-body"><tr><td class="empty" colspan="9">No open positions — pick Long or Short on any pair above, or add a symbol here.</td></tr></tbody>
+      </table>
+    </div>
+    <div class="panel-head" style="border-top:1px solid var(--border);border-bottom:none;"><h3 style="font-size:15px">Closed history</h3></div>
+    <div class="panel-scroll">
+      <table>
+        <thead><tr><th>Symbol</th><th>Side</th><th class="num">Entry</th><th class="num">Exit</th><th class="num">P&amp;L gross</th><th class="num">P&amp;L net</th><th>Signal at entry</th><th>Held</th><th>Closed</th></tr></thead>
+        <tbody id="closed-positions-body"><tr><td class="empty" colspan="9">No closed positions yet.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section-head">
+    <h2>Signal Scorecard — Forward Test</h2>
+    <div class="note">What actually happened after the desk made each call, measured on your own tracked positions — the only unbiased test here</div>
+  </div>
+  <div class="panel">
+    <div id="scorecard-body">
+      <div class="empty">No closed positions yet. Open a Tracker Position and the desk records what it was saying at that moment — close it later and the result lands here, grouped by the call that preceded it.</div>
+    </div>
+  </div>
+
+  <div class="section-head">
+    <h2>Signal Track Record — Historical Backtest</h2>
+    <div class="note">Historical win-rate on this watchlist's own daily bars, net of costs and compared against the base rate</div>
+  </div>
+  <div class="panel signal-panel">
+    <div id="base-rate-strip" class="cost-strip" style="display:none"></div>
+    <div class="signal-grid" id="signal-grid"><div class="empty" style="grid-column:1/-1">Backtesting signals against history…</div></div>
+  </div>
+
+  <div class="panel alerts-panel">
+    <div class="panel-head"><h3>Recent WhatsApp Alerts</h3><span class="count" id="alert-count">0 sent</span></div>
+    <div id="alerts-body"><div class="empty">No alerts yet this session.</div></div>
+  </div>
+
+  <footer>
+    <div class="disclaimer">
+      <b>This is an analysis tool. It cannot trade and never will.</b> It reads Bybit's public market data and nothing else — no account, no API key, no credentials of any kind, and no code path anywhere in it that can place, modify or cancel an order. "Tracker Positions" are simulated arithmetic against live prices, not orders. <b>Not investment advice.</b> Prices stream live from Bybit's public market data feed; on the default perpetuals setting the funding, open-interest, liquidation and long/short figures are public derivatives data, read-only. "Likelihood" and "Direction" are a qualitative heuristic (momentum, RSI, MACD, Bollinger Bands, Stochastic, moving averages, 52-week proximity, support/resistance, multi-timeframe confluence, and RSI/price divergence), not a statistical probability or a recommendation. The Signal Track Record panel is a real historical backtest of this watchlist's own price data, now reported net of trading costs and against the unconditional base rate — but past performance of a signal is not a guarantee of future results, sample sizes (shown as "n=") are often small, and because the watchlist is populated with pairs selected <i>for already having moved</i>, its numbers carry a selection bias that flatters them. The Signal Scorecard is the more trustworthy of the two: it records what the desk said <i>before</i> each outcome existed, so it has no such bias — it just needs time and closed positions to become meaningful. Positioning data (funding, open interest, liquidations, long/short ratio) describes how the market is positioned, not when it will move; crowded can stay crowded for a long time. <b>Spotlight's headline read is the same kind of technical-analysis heuristic, not a prediction</b> — it states what a specific set of indicators across 1m-12h currently imply and flags when they're genuinely uncertain (an RSI extreme or divergence), but markets can and do move against any reading, and low-timeframe leveraged trading carries real, fast risk of loss. Verify anything here before acting on it, and size any position with that risk in mind.
+    </div>
+  </footer>
+
+</div>
+
+<script>
+const lastPrices = {};
+const expanded = new Set();
+let lastData = null;
+
+function fmtPrice(p){
+  if(p === null || p === undefined) return '—';
+  if(p >= 1000) return p.toLocaleString(undefined,{maximumFractionDigits:2});
+  if(p >= 1) return p.toFixed(2);
+  if(p >= 0.01) return p.toFixed(4);
+  return p.toFixed(8).replace(/0+$/,'').replace(/\.$/,'');
+}
+function fmtPct(p){
+  if(p === null || p === undefined) return '—';
+  const s = p>=0? '+':'';
+  return s + p.toFixed(1) + '%';
+}
+function fmtNum(x, d){
+  if(x === null || x === undefined || isNaN(x)) return '—';
+  return x.toFixed(d===undefined?2:d);
+}
+function pctClass(p){ return (p===null||p===undefined) ? '' : (p>=0?'up-txt':'down-txt'); }
+function directionChip(dir){
+  const d = (dir||'two-sided').toLowerCase();
+  if(d.includes('bull')) return '<span class="chip up">▲ '+dir+'</span>';
+  if(d.includes('bear')) return '<span class="chip down">▼ '+dir+'</span>';
+  return '<span class="chip twoway">↕ '+(dir||'two-sided')+'</span>';
+}
+function confluenceChip(c){
+  if(!c) return '<span class="mtf-pill">—</span>';
+  const cls = c.direction==='bullish' ? 'up-txt' : (c.direction==='bearish' ? 'down-txt' : '');
+  return `<span class="mtf-pill ${cls}">${c.agree}/${c.total} tf</span>`;
+}
+function fundingChip(f){
+  if(!f) return '<span class="mtf-pill">—</span>';
+  // Colour by SQUEEZE RISK, not by sign: positive funding means crowded
+  // longs, which is a downside risk, so painting it green would invert the
+  // meaning of the number for anyone scanning the column quickly.
+  const cls = f.level === 'normal' ? '' : (f.crowded_side === 'long' ? 'down-txt' : 'up-txt');
+  const mark = f.level === 'extreme' ? '!' : '';
+  return `<span class="mtf-pill ${cls}" title="${f.summary || ''}">${f.annual_pct>=0?'+':''}${f.annual_pct}%${mark}</span>`;
+}
+function positioningChip(p, liq){
+  if(!p) return '<span class="mtf-pill">—</span>';
+  const cls = p.lean === 'bullish' ? 'up-txt' : (p.lean === 'bearish' ? 'down-txt' : '');
+  const cascade = (liq && liq.cascade) ? '<span class="cascade-flag">liq</span>' : '';
+  return `<span class="mtf-pill ${cls}" title="${(p.summary||'').replace(/"/g,'&quot;')}">${p.lean}</span>${cascade}`;
+}
+function heatWidth(h){ return Math.max(4, Math.min(100, h)); }
+function priceCell(sym, price){
+  const prev = lastPrices[sym];
+  let cls = 'price';
+  if(prev !== undefined && price !== prev){ cls += price > prev ? ' flash-up' : ' flash-down'; }
+  lastPrices[sym] = price;
+  return '<span class="'+cls+'">'+fmtPrice(price)+'</span>';
+}
+function drawSpark(canvas, points, up){
+  if(!canvas || !points || points.length < 2) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width = 64, h = canvas.height = 22;
+  ctx.clearRect(0,0,w,h);
+  const min = Math.min(...points), max = Math.max(...points);
+  const range = (max - min) || 1;
+  const color = up ? getComputedStyle(document.documentElement).getPropertyValue('--up').trim()
+                    : getComputedStyle(document.documentElement).getPropertyValue('--down').trim();
+  ctx.beginPath();
+  points.forEach((p,i)=>{
+    const x = (i/(points.length-1)) * (w-2) + 1;
+    const y = h - 2 - ((p-min)/range) * (h-4);
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.lineWidth = 1.4; ctx.strokeStyle = color; ctx.lineJoin='round'; ctx.stroke();
+  ctx.lineTo(w-1, h); ctx.lineTo(1, h); ctx.closePath();
+  ctx.globalAlpha = 0.12; ctx.fillStyle = color; ctx.fill(); ctx.globalAlpha = 1;
+}
+
+function toggleExpand(key){
+  if(expanded.has(key)) expanded.delete(key); else expanded.add(key);
+  if(lastData) render(lastData);
+}
+
+const TF_ORDER = ['15m','1h','4h','1D'];
+const SPOTLIGHT_TF_ORDER = ['1m','3m','5m','10m','15m','30m','1h','4h','12h'];
+
+// Shared by the per-row deep-dive panel (4 timeframes) and the Spotlight
+// panel (9 timeframes) -- same columns, just a different timeframe list.
+function buildMtfRows(tfs, order){
+  return order.filter(tf => tfs[tf]).map(tf=>{
+    const t = tfs[tf];
+    const macdTxt = t.macd ? `${fmtNum(t.macd.hist,3)}${t.macd.cross ? ' ('+t.macd.cross+')' : ''}` : '—';
+    const bbTxt = t.bollinger ? `${fmtNum(t.bollinger.percent_b*100,0)}%B${t.bollinger.squeeze ? ' · squeeze':''}` : '—';
+    const stochTxt = t.stochastic ? `${fmtNum(t.stochastic.k,0)}/${fmtNum(t.stochastic.d,0)}${t.stochastic.cross? ' ('+t.stochastic.cross+')':''}` : '—';
+    const atrTxt = t.atr!=null ? fmtPrice(t.atr) : '—';
+    const vwapTxt = t.vwap!=null ? fmtPrice(t.vwap) : '—';
+    const rsiHot = t.rsi14!=null && (t.rsi14>=70||t.rsi14<=30) ? ' rsi-hot' : '';
+    return `<tr>
+      <td class="tf-label">${tf}</td>
+      <td class="${rsiHot}">${t.rsi14!=null? fmtNum(t.rsi14,0):'—'}</td>
+      <td>${macdTxt}</td>
+      <td>${bbTxt}</td>
+      <td>${stochTxt}</td>
+      <td>${atrTxt}</td>
+      <td>${vwapTxt}</td>
+    </tr>`;
+  }).join('');
+}
+
+function mtfTableHtml(rows){
+  return rows ? `<table class="mtf-table">
+      <thead><tr><th>TF</th><th>RSI</th><th>MACD hist</th><th>Bollinger</th><th>Stoch K/D</th><th>ATR</th><th>VWAP</th></tr></thead>
+      <tbody>${rows}</tbody></table>` : '<div class="empty-note">Multi-timeframe data not ready yet — refreshes every few minutes.</div>';
+}
+
+function renderDetail(r, key){
+  const tfs = r.timeframes || {};
+  const mtfTable = mtfTableHtml(buildMtfRows(tfs, TF_ORDER));
+
+  const conf = r.confluence;
+  const confLine = conf ? `<div class="confluence-line">${directionChip(conf.label)}<span class="mtf-pill">score ${conf.score>=0?'+':''}${conf.score}</span></div>`
+                        : '<div class="empty-note">Confluence not ready yet.</div>';
+
+  const div = r.divergence;
+  const divBlock = div ? `<div class="divergence-note"><b>${div.kind==='bullish'?'Bullish':'Bearish'} divergence</b> — ${div.detail}.</div>`
+                        : '<div class="empty-note">No RSI/price divergence detected right now.</div>';
+
+  const sup = (r.support||[]).map(l=>`<div class="levelrow"><span>${fmtPrice(l.price)}</span><span class="touches">${l.touches}x · ${fmtPct(l.distance_pct)}</span></div>`).join('') || '<div class="empty-note">None found nearby.</div>';
+  const res = (r.resistance||[]).map(l=>`<div class="levelrow"><span>${fmtPrice(l.price)}</span><span class="touches">${l.touches}x · ${fmtPct(l.distance_pct)}</span></div>`).join('') || '<div class="empty-note">None found nearby.</div>';
+
+  const fib = r.fibonacci;
+  const fibBlock = fib ? `<div class="empty-note" style="margin-bottom:4px">${fib.trend} swing: ${fmtPrice(fib.swing_low)} → ${fmtPrice(fib.swing_high)}</div>` +
+      Object.entries(fib.levels).map(([ratio,price])=>`<div class="fib-row"><span>${(parseFloat(ratio)*100).toFixed(1)}%</span><span>${fmtPrice(price)}</span></div>`).join('')
+    : '<div class="empty-note">No clear recent swing to measure.</div>';
+
+  return `<div class="detail">
+    <div class="detail-grid">
+      <div>
+        <h4>Multi-timeframe readout</h4>
+        ${mtfTable}
+        <div style="margin-top:14px">
+          <h4>Confluence</h4>
+          ${confLine}
+          ${divBlock}
+        </div>
+      </div>
+      <div>
+        <div class="subgrid">
+          <div><h4>Support</h4>${sup}</div>
+          <div><h4>Resistance</h4>${res}</div>
+        </div>
+        <div style="margin-top:14px">
+          <h4>Fibonacci retracement (1D)</h4>
+          ${fibBlock}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderTable(bodyId, rows, prefix, opts){
+  const body = document.getElementById(bodyId);
+  const emptyMsg = (opts && opts.emptyMsg) || 'No data yet…';
+  if(!rows.length){ body.innerHTML = `<tr><td class="empty" colspan="14">${emptyMsg}</td></tr>`; return; }
+  body.innerHTML = rows.map((r,i)=>{
+    const key = prefix + r.symbol;
+    const isOpen = expanded.has(key);
+    const tierBadge = r.tier === 'discovered' ? '<span class="tier discovered">found</span>' : '';
+    const pts = r.sparkline || [];
+    const up = pts.length>1 ? pts[pts.length-1] >= pts[0] : true;
+    const mainRow = `
+    <tr class="row${isOpen?' expanded':''}" onclick="toggleExpand('${key}')">
+      <td><span class="rank">${i+1}</span></td>
+      <td><span class="caret">${isOpen?'▾':'▸'}</span><span class="sym">${r.symbol}</span><span class="cls">${r.asset_class}</span>${tierBadge}</td>
+      <td class="num">${priceCell(key, r.price)}</td>
+      <td class="num ${pctClass(r.change_24h_pct)}">${fmtPct(r.change_24h_pct)}</td>
+      <td class="num ${pctClass(r.change_7d_pct)}">${fmtPct(r.change_7d_pct)}</td>
+      <td class="num ${r.rsi14!=null && (r.rsi14>=70||r.rsi14<=30) ? 'rsi-hot':''}">${r.rsi14!=null? r.rsi14.toFixed(0):'—'}</td>
+      <td>${confluenceChip(r.confluence)}</td>
+      <td>${fundingChip(r.funding)}</td>
+      <td>${positioningChip(r.positioning, r.liquidations)}</td>
+      <td>${directionChip(r.direction)}</td>
+      <td><span class="heatbar"><span class="heatfill" style="width:${heatWidth(r.heat)}%"></span></span>${r.likelihood}</td>
+      <td><div class="tags">${(r.tags||[]).map(t=>'<span class="tag">'+t+'</span>').join('')}</div></td>
+      <td><canvas class="spark" id="spark-${key}" width="64" height="22"></canvas></td>
+      <td><div class="trade-btns" onclick="event.stopPropagation()">
+        <button class="trade-btn long" onclick="openPosition('${r.symbol}','long',this)">Long</button>
+        <button class="trade-btn short" onclick="openPosition('${r.symbol}','short',this)">Short</button>
+        <button class="trade-btn" onclick="setSpotlightQuick('${r.symbol}',this)" title="Set as Spotlight">🔦</button>
+      </div></td>
+    </tr>`;
+    const detailRow = isOpen ? `<tr class="detail-row"><td colspan="14">${renderDetail(r, key)}</td></tr>` : '';
+    return mainRow + detailRow;
+  }).join('');
+  rows.forEach(r=>{
+    const c = document.getElementById('spark-'+prefix+r.symbol);
+    const pts = r.sparkline || [];
+    const up = pts.length>1 ? pts[pts.length-1] >= pts[0] : true;
+    drawSpark(c, pts, up);
+  });
+}
+
+function renderAlerts(alerts){
+  const body = document.getElementById('alerts-body');
+  document.getElementById('alert-count').textContent = alerts.length + ' sent';
+  if(!alerts.length){ body.innerHTML = '<div class="empty">No alerts yet this session.</div>'; return; }
+  body.innerHTML = alerts.map(a=>{
+    const t = new Date(a.ts*1000);
+    const hh = String(t.getHours()).padStart(2,'0'), mm = String(t.getMinutes()).padStart(2,'0');
+    return `<div class="alert-row"><span class="alert-time">${hh}:${mm}</span><span class="alert-msg">${a.message}</span></div>`;
+  }).join('');
+}
+
+const SIGNAL_ORDER = ['rsi_oversold_cross','rsi_overbought_cross','macd_bull_cross','macd_bear_cross','bb_squeeze_breakout_up','bb_squeeze_breakout_down'];
+
+function renderSignalStats(payload){
+  const grid = document.getElementById('signal-grid');
+  const strip = document.getElementById('base-rate-strip');
+  // v7 wraps the old flat map as {signals, base_rates, cost_pct}; tolerate
+  // either shape so a stale snapshot never blanks the panel.
+  const stats = (payload && payload.signals) ? payload.signals : payload;
+  const baseRates = (payload && payload.base_rates) || {};
+  const costPct = (payload && payload.cost_pct) || 0;
+
+  if(!stats || !Object.keys(stats).length){
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1">Backtesting signals against history…</div>';
+    strip.style.display = 'none';
+    return;
+  }
+
+  const baseTxt = Object.entries(baseRates).map(([h,v])=>
+    v && v.up_rate!=null ? `<span><b>${v.up_rate}%</b> of all ${h}-day windows were up (n=${v.n})</span>` : ''
+  ).filter(Boolean).join('');
+  if(baseTxt){
+    strip.style.display = '';
+    strip.innerHTML = `<span>Base rate to beat:</span>${baseTxt}<span>Round-trip cost applied: <b>${costPct}%</b></span>`;
+  } else {
+    strip.style.display = 'none';
+  }
+
+  const keys = SIGNAL_ORDER.filter(k=>stats[k]);
+  grid.innerHTML = keys.map(k=>{
+    const s = stats[k];
+    const horizons = Object.entries(s.by_horizon || {}).map(([h, v])=>{
+      if(!v || v.n === 0) return `<div class="horizon"><span class="h-label">${h}d fwd</span><span class="h-stat">no data yet</span></div>`;
+      // Judge on the NET figure -- a signal that only wins before costs
+      // isn't a signal, so that's what gets the colour.
+      const cls = v.survives_costs ? 'up-txt' : 'down-txt';
+      const edge = v.edge_vs_base != null
+        ? ` <span class="mtf-pill">${v.edge_vs_base>=0?'+':''}${v.edge_vs_base}pp vs base</span>` : '';
+      return `<div class="horizon"><span class="h-label">${h}d fwd</span>` +
+             `<span class="h-stat ${cls}">${v.net_win_rate}% net · ${v.net_avg_return>=0?'+':''}${v.net_avg_return}%${edge}</span></div>`;
+    }).join('');
+    const maxN = Math.max(0, ...Object.values(s.by_horizon||{}).map(v=>(v&&v.n)||0));
+    const anySurvives = Object.values(s.by_horizon||{}).some(v=>v && v.survives_costs);
+    const warn = (maxN > 0 && !anySurvives)
+      ? '<div class="n-note" style="color:var(--down)">Does not survive trading costs at any horizon.</div>' : '';
+    return `<div class="signal-card">
+      <div class="name">${s.label}</div>
+      ${horizons}
+      ${warn}
+      <div class="n-note">n=${maxN} historical occurrences · net of ${costPct}% round-trip cost</div>
+    </div>`;
+  }).join('');
+}
+
+function renderScorecard(scorecard){
+  const body = document.getElementById('scorecard-body');
+  const rows = (scorecard && scorecard.rows) || [];
+  const unattributed = (scorecard && scorecard.unattributed) || 0;
+  if(!rows.length){
+    body.innerHTML = '<div class="empty">No closed positions yet. Open a Tracker Position and the desk records what it was ' +
+      'saying at that moment — close it later and the result lands here, grouped by the call that preceded it.</div>' +
+      (unattributed ? `<div class="sc-warn">${unattributed} closed position(s) had no signal context recorded.</div>` : '');
+    return;
+  }
+  const head = `<div class="scorecard-row scorecard-head">
+    <span>The desk said…</span><span>Trades</span><span>Win rate (net)</span><span>Avg return (net)</span><span>Gross vs net</span>
+  </div>`;
+  const body_rows = rows.map(r=>{
+    const thin = r.count < 5 ? ' <span class="sc-n">(thin sample)</span>' : '';
+    const eaten = r.eaten_by_costs
+      ? `<div class="sc-warn">⚠ This call wins before costs (${r.gross_avg_pnl_pct >= 0 ? '+' : ''}${r.gross_avg_pnl_pct}% avg gross) but loses after them. The edge is real but smaller than what it costs to capture.</div>`
+      : '';
+    return `<div class="scorecard-row">
+      <span class="sc-label">${r.label}${thin}</span>
+      <span class="sc-val">n=${r.count}</span>
+      <span class="sc-val ${r.win_rate != null && r.win_rate >= 50 ? 'up-txt':'down-txt'}">${r.win_rate != null ? r.win_rate+'%' : '—'}</span>
+      <span class="sc-val ${pctClass(r.avg_pnl_pct)}">${r.avg_pnl_pct != null ? (r.avg_pnl_pct>=0?'+':'')+r.avg_pnl_pct+'%' : '—'}</span>
+      <span class="sc-val">${r.gross_avg_pnl_pct != null ? (r.gross_avg_pnl_pct>=0?'+':'')+r.gross_avg_pnl_pct+'%' : '—'} → ${r.avg_pnl_pct != null ? (r.avg_pnl_pct>=0?'+':'')+r.avg_pnl_pct+'%' : '—'}</span>
+    </div>${eaten}`;
+  }).join('');
+  const foot = unattributed
+    ? `<div class="sc-warn">${unattributed} closed position(s) had no signal context recorded (opened before this feature, or on a symbol with no active call).</div>` : '';
+  body.innerHTML = head + body_rows + foot;
+}
+
+function fmtDuration(sec){
+  if(sec === null || sec === undefined) return '—';
+  sec = Math.max(0, Math.floor(sec));
+  const d = Math.floor(sec/86400), h = Math.floor((sec%86400)/3600), m = Math.floor((sec%3600)/60);
+  if(d > 0) return `${d}d ${h}h`;
+  if(h > 0) return `${h}h ${m}m`;
+  if(m > 0) return `${m}m`;
+  return `${sec}s`;
+}
+
+function fmtClock(ts){
+  if(!ts) return '—';
+  const t = new Date(ts*1000);
+  return t.toLocaleDateString(undefined,{month:'short',day:'numeric'}) + ' ' +
+         String(t.getHours()).padStart(2,'0') + ':' + String(t.getMinutes()).padStart(2,'0');
+}
+
+async function apiPost(url, body){
+  const resp = await fetch(url, {method:'POST', headers: body ? {'Content-Type':'application/json'} : undefined, body: body ? JSON.stringify(body) : undefined});
+  const data = await resp.json().catch(()=>({}));
+  if(!resp.ok) throw new Error(data.detail || ('request failed (' + resp.status + ')'));
+  return data;
+}
+
+async function openPosition(symbol, side, btn){
+  if(btn) btn.disabled = true;
+  try{
+    await apiPost('/api/positions/open', {symbol, side});
+  }catch(e){
+    console.error(e);
+    alert('Could not open position: ' + e.message);
+  }finally{
+    if(btn) btn.disabled = false;
+  }
+}
+
+async function openPositionFromInput(side, btn){
+  const input = document.getElementById('add-symbol');
+  const errEl = document.getElementById('add-error');
+  const symbol = input.value.trim().toUpperCase();
+  errEl.textContent = '';
+  if(!symbol){ errEl.textContent = 'Enter a symbol first.'; return; }
+  btn.disabled = true;
+  try{
+    await apiPost('/api/positions/open', {symbol, side});
+    input.value = '';
+  }catch(e){
+    errEl.textContent = e.message;
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+async function closePosition(id, btn){
+  if(btn) btn.disabled = true;
+  try{
+    await apiPost(`/api/positions/${id}/close`);
+  }catch(e){
+    console.error(e);
+    alert('Could not close position: ' + e.message);
+    if(btn) btn.disabled = false;
+  }
+}
+
+function pnlCell(v){
+  if(v === null || v === undefined) return '<td class="num">—</td>';
+  return `<td class="num ${pctClass(v)}">${v>=0?'+':''}${v.toFixed(2)}%</td>`;
+}
+
+function signalCell(ctx){
+  if(!ctx || !Object.keys(ctx).length) return '<td><span class="mtf-pill">—</span></td>';
+  if(ctx.spotlight_bias){
+    const cls = ctx.spotlight_bias === 'bullish' ? 'up-txt' : (ctx.spotlight_bias === 'bearish' ? 'down-txt' : '');
+    return `<td><span class="mtf-pill ${cls}">🔦 ${ctx.spotlight_bias} / ${ctx.spotlight_confidence||'?'}</span></td>`;
+  }
+  if(ctx.direction){
+    return `<td><span class="mtf-pill">${ctx.direction} · ${ctx.likelihood||'?'}</span></td>`;
+  }
+  return '<td><span class="mtf-pill">—</span></td>';
+}
+
+function renderCostStrip(costs){
+  const el = document.getElementById('cost-strip');
+  if(!el) return;
+  if(!costs){ el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.innerHTML =
+    `<span>Cost model: <b>${costs.taker_fee_pct}%</b> taker fee + <b>${costs.slippage_pct}%</b> slippage per side</span>` +
+    `<span>Round trip: <b>${costs.round_trip_pct}%</b></span>` +
+    `<span>Breakeven move: <b>${costs.breakeven_move_pct}%</b></span>` +
+    `<span>At ${costs.leverage}x that's <b>${costs.account_cost_pct}%</b> of account per trade</span>`;
+}
+
+function renderPositions(positions, costs){
+  positions = positions || {open: [], closed: [], summary: {}, scorecard: {rows: []}};
+  renderCostStrip(costs);
+  const s = positions.summary || {};
+  document.getElementById('stat-count').textContent = s.count || 0;
+  const wrEl = document.getElementById('stat-winrate');
+  wrEl.textContent = s.win_rate != null ? s.win_rate + '%' : '—';
+  wrEl.className = 'stat-value ' + (s.win_rate != null && s.win_rate >= 50 ? 'up-txt' : (s.win_rate != null ? 'down-txt' : ''));
+  const avgEl = document.getElementById('stat-avg');
+  avgEl.textContent = s.avg_pnl_pct != null ? (s.avg_pnl_pct>=0?'+':'') + s.avg_pnl_pct + '%' : '—';
+  avgEl.className = 'stat-value ' + pctClass(s.avg_pnl_pct);
+  const grossEl = document.getElementById('stat-gross-winrate');
+  if(grossEl){
+    grossEl.textContent = s.gross_win_rate != null ? s.gross_win_rate + '%' : '—';
+    grossEl.className = 'stat-value';
+  }
+  const bestEl = document.getElementById('stat-best');
+  bestEl.textContent = s.best_pnl_pct != null ? (s.best_pnl_pct>=0?'+':'') + s.best_pnl_pct + '%' : '—';
+  bestEl.className = 'stat-value ' + pctClass(s.best_pnl_pct);
+  const worstEl = document.getElementById('stat-worst');
+  worstEl.textContent = s.worst_pnl_pct != null ? s.worst_pnl_pct + '%' : '—';
+  worstEl.className = 'stat-value ' + (s.worst_pnl_pct != null && s.worst_pnl_pct < 0 ? 'down-txt' : '');
+
+  const openBody = document.getElementById('open-positions-body');
+  const openRows = positions.open || [];
+  if(!openRows.length){
+    openBody.innerHTML = '<tr><td class="empty" colspan="9">No open positions — pick Long or Short on any pair above, or add a symbol here.</td></tr>';
+  } else {
+    openBody.innerHTML = openRows.map(p=>`
+      <tr>
+        <td class="sym">${p.symbol}</td>
+        <td><span class="side-chip ${p.side}">${p.side}</span></td>
+        <td class="num">${fmtPrice(p.entry_price)}</td>
+        <td class="num">${priceCell('pos:'+p.id, p.current_price)}</td>
+        ${pnlCell(p.pnl_pct)}
+        ${pnlCell(p.net_pnl_pct)}
+        ${signalCell(p.signal_context)}
+        <td>${fmtDuration(p.duration_seconds)}</td>
+        <td><button class="close-btn" onclick="closePosition('${p.id}', this)">Close</button></td>
+      </tr>`).join('');
+  }
+
+  const closedBody = document.getElementById('closed-positions-body');
+  const closedRows = positions.closed || [];
+  if(!closedRows.length){
+    closedBody.innerHTML = '<tr><td class="empty" colspan="9">No closed positions yet.</td></tr>';
+  } else {
+    closedBody.innerHTML = closedRows.map(p=>`
+      <tr>
+        <td class="sym">${p.symbol}</td>
+        <td><span class="side-chip ${p.side}">${p.side}</span></td>
+        <td class="num">${fmtPrice(p.entry_price)}</td>
+        <td class="num">${fmtPrice(p.exit_price)}</td>
+        ${pnlCell(p.pnl_pct)}
+        ${pnlCell(p.net_pnl_pct)}
+        ${signalCell(p.signal_context)}
+        <td>${fmtDuration(p.duration_seconds)}</td>
+        <td>${fmtClock(p.exit_time)}</td>
+      </tr>`).join('');
+  }
+
+  renderScorecard(positions.scorecard);
+}
+
+function biasClass(bias){
+  if(bias === 'bullish') return 'bullish';
+  if(bias === 'bearish') return 'bearish';
+  return 'two-sided';
+}
+function biasChipHtml(bias){
+  if(bias === 'bullish') return '<span class="chip up">▲ bullish</span>';
+  if(bias === 'bearish') return '<span class="chip down">▼ bearish</span>';
+  return '<span class="chip twoway">↕ two-sided</span>';
+}
+function confidenceChipHtml(conf){
+  return `<span class="confidence-chip ${conf||'low'}">${conf||'low'} confidence</span>`;
+}
+function tierCardHtml(name, conf){
+  if(!conf || !conf.total) return `<div class="tier-card"><div class="tier-name">${name}</div><span class="mtf-pill">no data yet</span></div>`;
+  return `<div class="tier-card"><div class="tier-name">${name}</div>${directionChip(conf.label)}<div class="mtf-pill" style="margin-top:5px">${conf.agree}/${conf.total} tf agree · score ${conf.score>=0?'+':''}${conf.score}</div></div>`;
+}
+function levelText(l){
+  if(!l) return '—';
+  return `${fmtPrice(l.price)} <span class="mtf-pill">(${l.timeframe} · ${l.touches}x · ${fmtPct(l.distance_pct)})</span>`;
+}
+
+function keyLevelsHtml(kl){
+  kl = kl || {};
+  const atrTxt = kl.atr_reference ? `${fmtPrice(kl.atr_reference.value)} <span class="mtf-pill">(${kl.atr_reference.timeframe})</span>` : '—';
+  // Nearest and strongest are genuinely different questions: nearest is what
+  // price meets next, strongest is where it's most likely to actually stop.
+  // Showing only one under a "nearest" label was misleading for stops.
+  return `
+    <div class="kl-item"><span class="kl-label">Nearest support</span><span class="kl-value">${levelText(kl.nearest_support)}</span></div>
+    <div class="kl-item"><span class="kl-label">Strongest support</span><span class="kl-value">${levelText(kl.strongest_support)}</span></div>
+    <div class="kl-item"><span class="kl-label">Nearest resistance</span><span class="kl-value">${levelText(kl.nearest_resistance)}</span></div>
+    <div class="kl-item"><span class="kl-label">Strongest resistance</span><span class="kl-value">${levelText(kl.strongest_resistance)}</span></div>
+    <div class="kl-item"><span class="kl-label">ATR (stop-distance gauge)</span><span class="kl-value">${atrTxt}</span></div>
+  `;
+}
+
+function renderPositioningHtml(pos){
+  if(!pos) return '';
+  if(!pos.available){
+    return '<div class="not-available">Funding, open interest, liquidations and the long/short ratio only exist on ' +
+           'derivatives. Set <b>BYBIT_CATEGORY=linear</b> in your .env to analyze perpetuals and unlock this panel — ' +
+           'these numbers are not shown on spot rather than being guessed at.</div>';
+  }
+  const f = pos.funding, oi = pos.open_interest, ls = pos.long_short_ratio, liq = pos.liquidations, read = pos.read;
+
+  const fundingCard = f ? `<div class="pos-card">
+      <div class="pos-name">Funding rate</div>
+      <div class="pos-value ${f.crowded_side==='long'?'down-txt':(f.crowded_side==='short'?'up-txt':'')}">${f.per_period_pct>=0?'+':''}${f.per_period_pct.toFixed(4)}% <span class="mtf-pill">/8h · ${f.annual_pct>=0?'+':''}${f.annual_pct}% yr</span></div>
+      <div class="pos-note">${f.summary}</div>
+    </div>` : '';
+
+  const oiCard = oi ? `<div class="pos-card">
+      <div class="pos-name">Open interest</div>
+      <div class="pos-value ${oi.change_pct>=0?'up-txt':'down-txt'}">${oi.change_pct>=0?'+':''}${oi.change_pct}% <span class="mtf-pill">vs price ${oi.price_change_pct>=0?'+':''}${oi.price_change_pct}%</span></div>
+      <div class="pos-note">${oi.summary}</div>
+    </div>` : '';
+
+  const lsCard = ls ? `<div class="pos-card">
+      <div class="pos-name">Long / short accounts</div>
+      <div class="pos-value"><span class="up-txt">${ls.long_pct}%</span> / <span class="down-txt">${ls.short_pct}%</span></div>
+      <div class="pos-note">${ls.summary}</div>
+    </div>` : '';
+
+  let liqCard = '';
+  if(liq){
+    const total = liq.total_usd || 0;
+    const longPct = total > 0 ? (liq.long_usd/total*100) : 0;
+    const bar = total > 0 ? `<div class="liq-bar"><span class="liq-long" style="width:${longPct}%"></span><span class="liq-short" style="width:${100-longPct}%"></span></div>` : '';
+    liqCard = `<div class="pos-card">
+      <div class="pos-name">Liquidations (${liq.window_minutes}m)</div>
+      <div class="pos-value">$${Math.round(total).toLocaleString()}${liq.cascade?'<span class="cascade-flag">cascade</span>':''}</div>
+      ${bar}
+      <div class="pos-note">${liq.summary}</div>
+    </div>`;
+  }
+
+  const cards = [fundingCard, oiCard, lsCard, liqCard].filter(Boolean).join('');
+  const readBlock = read ? `<div class="pos-read ${read.lean==='bullish'?'bullish':(read.lean==='bearish'?'bearish':'')}">
+      <b>Positioning read — ${read.lean} (${read.confidence} confidence).</b> ${read.summary}
+    </div>` : '';
+
+  return `<div class="spotlight-mtf-wrap" style="margin-bottom:0">
+      <h4 style="margin:0 0 4px;color:var(--text-dim);font-size:15px">Leverage &amp; positioning</h4>
+      <div class="empty-note" style="margin-bottom:2px">The only data here that the price chart doesn't already contain.</div>
+    </div>
+    ${readBlock}
+    <div class="pos-grid">${cards || '<div class="empty-note">Positioning data loading…</div>'}</div>`;
+}
+function spotlightDivergenceList(tfs, order){
+  const items = order.filter(tf => tfs[tf] && tfs[tf].divergence).map(tf=>{
+    const d = tfs[tf].divergence;
+    return `<div class="divergence-note"><b>${tf} · ${d.kind==='bullish'?'Bullish':'Bearish'} divergence</b> — ${d.detail}.</div>`;
+  });
+  return items.length ? items.join('') : '<div class="empty-note">No RSI/price divergence on any timeframe right now.</div>';
+}
+
+let lastSpotlightSnapshot = null;
+function updateSpotlightMeta(){
+  const el = document.getElementById('spotlight-meta');
+  if(!el || !lastSpotlightSnapshot || !lastSpotlightSnapshot.data) return;
+  const d = lastSpotlightSnapshot.data;
+  const ageSec = Math.max(0, Math.floor(Date.now()/1000 - d.updated_at));
+  const refreshSec = lastSpotlightSnapshot.refresh_seconds || 180;
+  const remain = Math.max(0, refreshSec - ageSec);
+  const mm = Math.floor(remain/60), ss = remain%60;
+  el.textContent = `updated ${fmtDuration(ageSec)} ago · next refresh in ${mm}:${String(ss).padStart(2,'0')}`;
+}
+setInterval(updateSpotlightMeta, 1000);
+
+function renderSpotlight(spotlightWrap){
+  const body = document.getElementById('spotlight-body');
+  const clearBtn = document.getElementById('spotlight-clear-btn');
+  lastSpotlightSnapshot = spotlightWrap;
+  if(!spotlightWrap || !spotlightWrap.symbol){
+    clearBtn.style.display = 'none';
+    body.innerHTML = '<div class="empty">No Spotlight symbol selected — pick one above, or click 🔦 on any watchlist row.</div>';
+    return;
+  }
+  clearBtn.style.display = '';
+  const data = spotlightWrap.data;
+  if(!data){
+    body.innerHTML = `<div class="empty">Loading ${spotlightWrap.symbol}'s 1m-12h breakdown…</div>`;
+    return;
+  }
+  const interp = data.interpretation || {};
+  const conf = data.confluence || {};
+  const mtfTable = mtfTableHtml(buildMtfRows(data.timeframes || {}, SPOTLIGHT_TF_ORDER));
+  const cautionHtml = (interp.caution_reasons && interp.caution_reasons.length)
+    ? `<div class="caution-list"><b>Caution:</b> ${interp.caution_reasons.join('; ')}</div>` : '';
+
+  const note = interp.positioning_note;
+  const noteHtml = note
+    ? `<div class="${note.indexOf('DISAGREES') >= 0 ? 'pos-disagree' : 'pos-read'}">${note}</div>` : '';
+
+  const cc = interp.cost_check;
+  const costHtml = cc ? `<div class="cost-check ${cc.verdict}"><b>Cost check:</b> ${cc.note}</div>` : '';
+
+  const liveTfs = (data.live_klines || []);
+  const liveBadge = liveTfs.length
+    ? `<span class="mtf-pill" title="These timeframes update straight off the WebSocket, not the refresh cycle">⚡ ${liveTfs.join('/')} live</span>` : '';
+
+  body.innerHTML = `
+    <div class="spotlight-head">
+      <div class="spotlight-symbol-line"><span class="sym" style="font-size:19px">${data.symbol}</span>${priceCell('spotlight:'+data.symbol, data.price)}${liveBadge}</div>
+      <div class="spotlight-meta" id="spotlight-meta">updated just now</div>
+    </div>
+    <div class="spotlight-headline ${biasClass(interp.bias)}">
+      <div class="spotlight-bias-row">${biasChipHtml(interp.bias)}${confidenceChipHtml(interp.confidence)}</div>
+      <div class="spotlight-headline-text">${interp.headline || ''}</div>
+    </div>
+    ${cautionHtml}
+    ${noteHtml}
+    ${costHtml}
+    <div class="tier-grid">
+      ${tierCardHtml('Entry · 1m-10m', conf.entry)}
+      ${tierCardHtml('Session · 15m-1h', conf.micro)}
+      ${tierCardHtml('Macro · 4h-12h', conf.macro)}
+      ${tierCardHtml('Overall · all 9', conf.overall)}
+    </div>
+    ${renderPositioningHtml(data.positioning)}
+    <div class="key-levels-row">${keyLevelsHtml(interp.key_levels)}</div>
+    <div class="spotlight-mtf-wrap">
+      <h4 style="margin-bottom:8px;color:var(--text-dim);font-size:15px">Full 1m-12h readout</h4>
+      ${mtfTable}
+      <h4 style="margin:14px 0 6px;color:var(--text-dim);font-size:15px">Divergence by timeframe</h4>
+      ${spotlightDivergenceList(data.timeframes || {}, SPOTLIGHT_TF_ORDER)}
+    </div>
+  `;
+  updateSpotlightMeta();
+}
+
+async function setSpotlight(symbol, btn, errEl){
+  if(btn) btn.disabled = true;
+  try{
+    await apiPost('/api/spotlight', {symbol});
+    const input = document.getElementById('spotlight-symbol');
+    if(input) input.value = '';
+    if(errEl) errEl.textContent = '';
+  }catch(e){
+    if(errEl) errEl.textContent = e.message; else alert('Could not set Spotlight: ' + e.message);
+  }finally{
+    if(btn) btn.disabled = false;
+  }
+}
+async function setSpotlightFromInput(btn){
+  const input = document.getElementById('spotlight-symbol');
+  const errEl = document.getElementById('spotlight-error');
+  const symbol = input.value.trim().toUpperCase();
+  errEl.textContent = '';
+  if(!symbol){ errEl.textContent = 'Enter a symbol first.'; return; }
+  await setSpotlight(symbol, btn, errEl);
+}
+async function setSpotlightQuick(symbol, btn){
+  await setSpotlight(symbol, btn, document.getElementById('spotlight-error'));
+}
+async function clearSpotlight(btn){
+  if(btn) btn.disabled = true;
+  try{ await apiPost('/api/spotlight/clear'); }
+  catch(e){ console.error(e); alert('Could not clear Spotlight: ' + e.message); }
+  finally{ if(btn) btn.disabled = false; }
+}
+
+function fmtUptime(sec){
+  sec = Math.floor(sec);
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+  return `uptime ${h}h ${m}m ${s}s`;
+}
+
+function setFeedDot(name, status){
+  const dot = document.getElementById('dot-'+name), txt = document.getElementById('txt-'+name);
+  dot.className = 'feeddot';
+  const inProgress = ['starting', 'scanning market', 'seeding history', 'seeded', 'connecting'];
+  if(status === 'live') dot.classList.add('live');
+  else if(status && (inProgress.includes(status) || status.startsWith('reconnecting'))) dot.classList.add('reconnecting');
+  else if(status) dot.classList.add('error');
+  txt.textContent = status || '—';
+}
+
+function render(data){
+  lastData = data;
+  renderSpotlight(data.spotlight);
+  renderTable('top-body', data.top || [], 'top:', {emptyMsg:'Waiting for first tick…'});
+  renderTable('watch-body', data.also_watching || [], 'watch:', {emptyMsg:'No discovered pairs yet — market scan runs shortly after startup.'});
+  renderAlerts(data.alerts || []);
+  renderSignalStats(data.signal_stats || {});
+  renderPositions(data.positions, data.costs);
+  document.getElementById('uptime').textContent = fmtUptime(data.uptime_seconds || 0);
+  if(data.feed_status){
+    setFeedDot('bybit', data.feed_status.bybit);
+  }
+  if(data.market){
+    const chip = document.getElementById('market-chip');
+    chip.style.display = '';
+    document.getElementById('txt-market').textContent =
+      data.market.category === 'linear' ? 'perps (funding/OI/liq)' : data.market.category;
+  }
+  if(data.universe_scanned_count){
+    const chip = document.getElementById('scan-chip');
+    chip.style.display = '';
+    document.getElementById('txt-scan').textContent = data.universe_scanned_count + ' pairs';
+  }
+}
+
+let ws;
+function connect(){
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(proto + '://' + location.host + '/ws');
+  ws.onopen = ()=>{ document.getElementById('dot-socket').className='feeddot live'; document.getElementById('txt-socket').textContent='connected'; };
+  ws.onclose = ()=>{
+    document.getElementById('dot-socket').className='feeddot error';
+    document.getElementById('txt-socket').textContent='disconnected — retrying…';
+    setTimeout(connect, 3000);
+  };
+  ws.onerror = ()=>{ ws.close(); };
+  ws.onmessage = (evt)=>{ try{ render(JSON.parse(evt.data)); }catch(e){ console.error(e); } };
+}
+connect();
+</script>
+</body>
+</html>
