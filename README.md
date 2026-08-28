@@ -1,2 +1,10 @@
 # Crypto-Quant-Desk
-Crypto Quant Desk with indepth technical analysis and prediction and spotlight function for indepth short term analysis
+Quant Desk Live is a self-hosted, real-time market monitoring and technical analysis tool for crypto perpetual futures, built to surface potential breakout setups — not to place trades. It is explicitly analysis-only: it never touches an exchange account, holds no API secrets, and cannot execute an order. Every "position" it tracks is a fictional, locally-logged paper trade used purely to measure whether its own signals actually work.
+
+The app streams live data from Bybit's public REST and WebSocket APIs (no account required) across a rotating watchlist of the day's most active pairs plus a small pinned core list. For each symbol it computes RSI, MACD, Bollinger Bands, VWAP, support/resistance clustering, Fibonacci levels, and multi-timeframe confluence, then scores each into a heat/likelihood/direction read on a live dashboard with WebSocket-pushed updates.
+
+A "Spotlight" mode puts one chosen symbol under much closer watch: live 1m/3m/5m klines streamed tick-by-tick, plus 10m through 12h timeframes, refreshed continuously rather than polled. On perpetual futures it layers in positioning context most retail dashboards skip: funding rate (annualized, with crowded-side detection), open interest deltas interpreted against price direction to distinguish new positioning from short-covering, the long/short account ratio, and real-time liquidation flow with cascade detection.
+
+Two features keep the system honest rather than just optimistic. Every backtested signal (RSI crosses, MACD crosses, Bollinger squeeze breakouts) is benchmarked against the asset's own unconditional base rate and reported net of a modeled trading cost (fees + slippage), so a "signal" that just matches random drift or gets eaten by costs shows up as such. A forward-testing scorecard also captures the exact signal context at the moment a paper position opens, closing the loop between "this looked good" and "did it actually work," kept separate from the historical backtest, which carries selection bias inherent to a live watchlist.
+
+Built with Python (FastAPI + WebSockets) on the backend and vanilla JS on the frontend, with zero paid data dependencies — everything runs on Bybit's free public endpoints.
