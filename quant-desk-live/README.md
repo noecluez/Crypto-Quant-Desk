@@ -10,11 +10,13 @@ resistance, Fibonacci retracement, multi-timeframe confluence), the
 a cost-adjusted historical backtest, a live-updating web UI, and WhatsApp
 alerts when something crosses a threshold.
 
-> **This app is an analysis tool. It cannot place a trade.**
-> There is no order-placing code anywhere in it, it holds no exchange
-> credentials, and it never asks for an API key. "Tracker Positions" are
-> simulated arithmetic against live prices — a way to test your own calls,
-> not a way to execute them. Everything it reads is public market data.
+> **As of v8, this app CAN place real trades on Bybit futures — but only if
+> you explicitly turn that on.** `EXECUTION_ENABLED=false` by default, which
+> means the app behaves exactly as it always has: no order-placing code
+> path runs, no exchange credentials are used, "Tracker Positions" are
+> simulated arithmetic against live prices, and everything it reads is
+> public market data. See **"Live execution (Bybit futures)"** below before
+> you decide whether to turn it on, and test on Bybit's testnet first.
 
 Three things make it more than an indicator dashboard:
 
@@ -41,9 +43,12 @@ itself** — Bybit's public REST and WebSocket endpoints are open to anyone.
 The only signup in this whole app is the free, 2-minute WhatsApp opt-in
 below.
 
-It runs entirely on your own machine. It holds no trading credentials, can't
-place orders, and no data leaves your computer except the read-only
-connection to Bybit and the one-line alert text sent through CallMeBot.
+It runs entirely on your own machine. With live execution off (the default),
+it holds no trading credentials, places no orders, and no data leaves your
+computer except the read-only connection to Bybit and the one-line alert
+text sent through CallMeBot. Turning execution on adds your own Bybit API
+key (stored only in your local `.env`) and real order traffic to Bybit — see
+"Live execution" below.
 
 ## 1. Install
 
@@ -353,6 +358,178 @@ current live price and starts tracking it in real time until you hit
   reopening it later. That file is gitignored; delete it any time to reset
   your history.
 
+## Live execution (Bybit futures) — optional, off by default
+
+Everything above this section works identically whether or not you ever
+touch this one. `EXECUTION_ENABLED=false` in `.env.example`/`.env` by
+default; leave it there and nothing in this section applies to you.
+
+**Read this whole section before setting it to `true`.** This is real money,
+real leverage, and a program placing orders on its own. Every safeguard
+below reduces risk; none of them eliminate it. Futures trading with
+leverage can lose more than the margin allocated to a single trade in fast
+or gapping markets, and a bug, an exchange outage, or a genuinely bad
+signal can all cost real money. **Nothing in this app is investment advice.**
+
+### What it does
+
+Once enabled, the app evaluates every symbol in the deep watchlist once per
+`DEEP_REFRESH_SECONDS` cycle (default every 5 minutes — not on every price
+tick) against an entry gate, and if approved, sizes and opens a real
+position on Bybit with a stop loss and take profit attached from the
+moment it exists.
+
+**The entry gate (`execution/signal_gate.py`)** — per your own framing when
+this was built: *"trade on relatively good confluence into the direction
+that the bias is."* Two things must both hold:
+
+1. **Technical trigger** — the watchlist's heat-score direction must be a
+   real bias (`bullish bias` / `bearish bias`, never `two-sided` — that
+   already means the RSI-extreme/divergence uncertainty gate in
+   `analysis/indicators.py` is active, and that gate always wins over
+   everything else in this app). The independently-computed multi-timeframe
+   confluence must agree with that direction, with at least
+   `EXECUTION_MIN_CONFLUENCE_RATIO` (default 75%, i.e. 3 of 4 timeframes)
+   agreeing and a confluence score of at least `EXECUTION_MIN_CONFLUENCE_SCORE`
+   (default 0.35).
+2. **Signal-performance gate** — before acting, the app checks its OWN
+   trading history (Tracker Positions + real closed live trades, pooled) for
+   this exact kind of setup. A bucket (e.g. "bullish bias / Low likelihood",
+   or a given confluence-agreement ratio) only blocks or is trusted once it
+   has at least `EXECUTION_MIN_BUCKET_N` (default 10) closed trades — below
+   that, it's "no information yet," not "bad." This is what lets the desk
+   act on 46+ trades of its own paper-trading history instead of a static
+   confidence-tier heuristic: as of this being built, "bullish bias / Low"
+   had a strong demonstrated edge (n=21, 76% net win rate) while several
+   "High confidence" buckets were both thin and mediocre, and shorts overall
+   had underperformed longs — the gate reads directly from whatever your
+   `positions.json`/`execution/live_positions.json` show *now*, so this
+   keeps adapting as you trade.
+
+**Stop loss / take profit placement (`execution/order_manager.py`)** —
+hybrid ATR + support/resistance: the stop starts at
+`EXECUTION_SL_ATR_MULT` × ATR(1h) away from entry, snapped to a nearby
+well-tested support/resistance level if one sits close enough
+(`EXECUTION_SL_SR_SNAP_MAX_PCT`); the target starts at
+`EXECUTION_TP_ATR_MULT` × ATR and extends to a stronger level beyond it if
+one exists — but never below `EXECUTION_MIN_REWARD_RISK` (default 2:1).
+
+**Position sizing (`execution/risk.py`)** — chosen so a full stop-out costs
+exactly `EXECUTION_RISK_PER_TRADE_PCT`% of your account equity (default
+2%), **regardless of leverage**. Leverage (dynamic, scaled by confluence
+strength and damped by volatility, capped at `EXECUTION_MAX_LEVERAGE`) only
+changes how much margin gets locked up to hold that position size — it
+never changes your worst-case dollar loss on the trade. Margin mode is
+always isolated, so one bad trade's margin is never shared with another.
+
+**Trailing stop hand-off** — once a position reaches `EXECUTION_TRAILING_ACTIVATE_R`
+multiples of its own initial risk (R) in profit, the fixed stop loss is
+replaced with an exchange-native trailing stop (distance =
+`EXECUTION_TRAILING_ATR_MULT` × ATR) to lock in gains on the way to the
+target. This is a deliberate hand-off (cancel the fixed stop, then set the
+trailing one, as two sequential calls) rather than running both at once —
+Bybit's own API docs don't fully specify which one wins if both are live
+simultaneously, so the app avoids that ambiguity entirely. If the app dies
+between the two calls, whichever stop was set first is still live; there is
+never a moment with no stop at all.
+
+**Every stop loss, take profit, and trailing stop lives on the exchange**,
+attached to the position via Bybit's native conditional-order API — not
+simulated by this app polling prices. They still trigger if your laptop
+sleeps, loses power, or the app crashes. A monitoring loop
+(`EXECUTION_MONITOR_SECONDS`, default 20s) separately watches for the
+trailing-stop hand-off point and for positions Bybit has already closed on
+its own, reconciling this app's records to match.
+
+### Hard risk limits (enforced regardless of the signal)
+
+All configurable in `.env`, defaults shown:
+
+| Limit | Default | What it does |
+|---|---|---|
+| `EXECUTION_MAX_LEVERAGE` | 10 | Hard ceiling, never exceeded regardless of confluence |
+| `EXECUTION_RISK_PER_TRADE_PCT` | 2% | Max account-equity loss if a single trade's stop is hit |
+| `EXECUTION_MAX_CONCURRENT_POSITIONS` | 5 | Desk-wide cap across all symbols |
+| `EXECUTION_DAILY_LOSS_LIMIT_PCT` | 10% | Cumulative UTC-day loss that halts all NEW entries |
+| `EXECUTION_SYMBOL_COOLDOWN_MINUTES` | 30 | Minimum wait before re-entering a symbol just closed |
+
+**The daily loss circuit breaker** (`execution/risk.py`) tracks realized P&L
+as a % of account equity through the UTC day. Once it breaches the limit,
+new entries stop — existing open positions are left alone (their own
+exchange-native SL/TP keep protecting them). It stays halted **even across
+a day boundary** until a human re-arms it from the web UI's Live Execution
+panel or `POST /api/execution/rearm` — a bad night doesn't "fix itself" by
+waiting for midnight.
+
+**Cost buffer**: every execution decision uses the measured round-trip cost
+(`TAKER_FEE_PCT` + `SLIPPAGE_PCT`, both sides) **plus an extra
+`EXECUTION_EXTRA_COST_BUFFER_PCT`** (default 0.3%) on top, as a safety
+margin against fee-tier surprises, funding paid while holding, and
+worse-than-assumed slippage. A trade is rejected outright if its target
+doesn't clear several multiples of this combined figure.
+
+### Safety controls (web UI + API)
+
+The **Live Execution** panel (top of the page) shows real-time status —
+testnet/mainnet, enabled/paused/halted, today's P&L against the daily
+limit, every open and closed live position — and four controls:
+
+- **Pause new entries** — stops the entry gate from firing (in-memory only,
+  resets to whatever `.env` says on restart). Open positions are untouched.
+- **Resume** — the opposite.
+- **Re-arm circuit breaker** — clears a tripped daily-loss halt. Separate
+  from Pause/Resume on purpose: if both are active, you have to consciously
+  clear both.
+- **⛔ Flatten all positions now** — closes every open live position at
+  market immediately and pauses execution so nothing reopens right after.
+  The same four actions are available as `POST /api/execution/{pause,resume,rearm,flatten}`.
+
+### Startup reconciliation
+
+Every time the app starts with execution enabled, it fetches your actual
+open positions from Bybit **before** anything else runs, and reconciles:
+
+- A locally-tracked "open" position that Bybit no longer shows is closed
+  locally using the best available price, so the signal-performance gate
+  and circuit breaker see an accurate outcome instead of a stale "open."
+- An open position on Bybit with **no** local record (opened manually, or
+  from state lost some other way) is left completely alone — the app never
+  guesses or adopts a position it didn't open — but halts the circuit
+  breaker so a human looks before any new automated entry happens.
+- If Bybit can't be reached at all during this check, the circuit breaker
+  halts automatically rather than proceeding blind.
+
+### Setting it up
+
+1. **Get a testnet account first.** Go to
+   [testnet.bybit.com](https://testnet.bybit.com), sign up (separate account
+   from mainnet), and use the faucet for test USDT.
+2. **Create an API key**: Account → API Management → Create New Key.
+   - Permissions: **Contract - Orders** and **Contract - Positions** only.
+   - **Do NOT enable withdrawals.** This app never needs them, and enabling
+     them is pure downside risk if the key ever leaks.
+   - Restrict to your IP if your connection is static.
+3. In `.env`:
+   ```
+   EXECUTION_ENABLED=true
+   BYBIT_TESTNET=true
+   BYBIT_API_KEY=<your testnet key>
+   BYBIT_API_SECRET=<your testnet secret>
+   ```
+4. Restart the app (`python main.py`) and watch the Live Execution panel.
+   Let it run on testnet — through real entries, exits, the trailing-stop
+   hand-off, and ideally a day that trips the circuit breaker — until you
+   understand and trust what it's doing.
+5. **Only then**, if you choose to: create a separate mainnet API key (same
+   permissions, no withdrawals), set `BYBIT_TESTNET=false` and swap in the
+   mainnet key/secret. Start small. There is no supported shortcut past
+   testnet, and this app will not encourage you to skip it.
+
+Every numeric limit in this section is a `.env` value — see the fully
+commented block in `.env.example` for all of them, including the ones not
+called out above (`EXECUTION_MIN_LEVERAGE`, `EXECUTION_SL_ATR_MULT`,
+`EXECUTION_TP_ATR_MULT`, etc.).
+
 ## If the Bybit status chip won't go green
 
 The chip in the top right now always shows a real, specific status instead
@@ -388,9 +565,10 @@ need to allow for `python.exe`/`main.py`.
   history endpoint) and then updated live by treating the current price as
   an evolving "today" bar — the same methodology the static dashboard used,
   just computed from real numbers instead of scraped ones now.
-- This app **cannot place trades** — it only ever reads market data. It is
-  an analysis tool by design and there is no code path in it that could
-  submit an order.
+- With `EXECUTION_ENABLED=false` (the default), this app only ever reads
+  market data — no order-placing code path runs. With it set to `true`, see
+  "Live execution" above for the full safety model; the risk of loss from
+  automated leveraged trading is real even with every safeguard in place.
 - **The Signal Track Record carries selection bias that no amount of maths
   fixes.** It's pooled across your ~20-pair deep watchlist's own daily-bar
   history (up to ~260 days per pair), and that watchlist is populated with
@@ -421,3 +599,22 @@ need to allow for `python.exe`/`main.py`.
   right now — it's meant to surface things you didn't think to look for,
   not to be a stable list you track over weeks. Pin anything you want to
   keep watching long-term into `CRYPTO_SYMBOLS` instead.
+- **Live execution polls, it doesn't stream, for fills and closes.** The
+  entry gate runs on the deep-refresh cadence (5 min default), and the
+  monitor loop that detects exchange-side closes and handles the
+  trailing-stop hand-off polls every `EXECUTION_MONITOR_SECONDS` (20s
+  default) rather than listening on Bybit's private WebSocket for instant
+  fill confirmation. Both are deliberate v1 simplifications for a smaller,
+  more auditable codebase; a private-WS listener would be the natural next
+  step if you want faster reaction to fills.
+- **A reconciled close's `exit_reason` (stop_loss/take_profit/trailing_stop)
+  is a best-effort label**, inferred from the last known price relative to
+  the recorded levels — it's cosmetic (shown in the UI/log) and never
+  affects the P&L math, which is always computed from actual entry/exit
+  prices.
+- **The signal-performance gate's evidence base is still small.** As of
+  this feature shipping, the combined paper+live trade history is well
+  under a thousand trades, and most fine-grained buckets are far thinner
+  than that — `EXECUTION_MIN_BUCKET_N` exists specifically so thin buckets
+  don't get treated as proven-bad or proven-good. Treat early live results
+  the same way: informative, not conclusive.

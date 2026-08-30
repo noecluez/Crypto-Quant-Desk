@@ -55,8 +55,25 @@ def cost_in_account_terms_pct(cost_pct: float, leverage: float) -> float:
     return cost_pct * max(leverage, 0.0)
 
 
-def summarize_costs(taker_fee_pct: float, slippage_pct: float, leverage: float) -> dict:
-    """One dict with everything the UI needs to be honest about costs."""
+def account_pnl_pct(net_pnl_pct: float, leverage: float, position_size_pct: float) -> float:
+    """A single trade's net (price-move, leverage-neutral) return translated
+    into "% of total account equity", assuming the position used
+    `position_size_pct`% of the account as margin at `leverage`x.
+
+    Derivation: margin = position_size_pct% of account; notional = margin *
+    leverage; dollar P&L = notional * net_pnl_pct/100; as a % of account that
+    dollar P&L / account = (position_size_pct/100) * leverage * net_pnl_pct.
+
+    This is a sizing *assumption* applied uniformly for framing purposes --
+    the app never actually allocates, holds, or tracks real account capital."""
+    return net_pnl_pct * (position_size_pct / 100.0) * max(leverage, 0.0)
+
+
+def summarize_costs(taker_fee_pct: float, slippage_pct: float, leverage: float,
+                     position_size_pct: float = 0.0) -> dict:
+    """One dict with everything the UI needs to be honest about costs (and,
+    since it travels alongside costs in the UI, the position-sizing
+    assumption used to turn P&L into account-equity terms)."""
     cost = round_trip_cost_pct(taker_fee_pct, slippage_pct)
     return {
         "taker_fee_pct": taker_fee_pct,
@@ -65,4 +82,5 @@ def summarize_costs(taker_fee_pct: float, slippage_pct: float, leverage: float) 
         "breakeven_move_pct": round(breakeven_move_pct(cost), 4),
         "leverage": leverage,
         "account_cost_pct": round(cost_in_account_terms_pct(cost, leverage), 3),
+        "position_size_pct": position_size_pct,
     }

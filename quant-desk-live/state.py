@@ -134,6 +134,7 @@ class AppState:
         from config import config
         from analysis.costs import summarize_costs
 
+        execution_snapshot = self._execution_snapshot(config)
         active = [s for s in self.symbols.values() if s.symbol in self.deep_symbols]
         ranked = sorted([s for s in active if s.price > 0], key=lambda s: s.heat, reverse=True)
         top, also_watching = ranked[:10], ranked[10:20]
@@ -152,7 +153,11 @@ class AppState:
             "crypto": sorted([s.to_dict() for s in active], key=lambda s: s["symbol"]),
             "universe_scanned_count": self.universe_scanned_count,
             "signal_stats": self.signal_stats,
-            "positions": position_book.snapshot(live_prices),
+            "positions": position_book.snapshot(
+                live_prices,
+                position_size_pct=config.POSITION_SIZE_PCT,
+                leverage=config.ASSUMED_LEVERAGE,
+            ),
             "spotlight": {
                 "symbol": self.spotlight_symbol,
                 "data": self.spotlight,
@@ -162,8 +167,38 @@ class AppState:
                 "category": config.BYBIT_CATEGORY,
                 "derivatives": config.is_derivatives,
             },
-            "costs": summarize_costs(config.TAKER_FEE_PCT, config.SLIPPAGE_PCT, config.ASSUMED_LEVERAGE),
+            "costs": summarize_costs(
+                config.TAKER_FEE_PCT, config.SLIPPAGE_PCT, config.ASSUMED_LEVERAGE,
+                config.POSITION_SIZE_PCT,
+            ),
+            "execution": execution_snapshot,
         }
+
+    def _execution_snapshot(self, config) -> dict:
+        """Live-execution status for the UI. Cheap and safe to call even
+        when execution is disabled/unconfigured -- never touches the
+        network itself (live_positions.json and circuit_breaker.json are
+        both local files)."""
+        base = {
+            "enabled": config.EXECUTION_ENABLED,
+            "configured": config.execution_configured,
+            "testnet": config.BYBIT_TESTNET,
+            "max_leverage": config.EXECUTION_MAX_LEVERAGE,
+            "risk_per_trade_pct": config.EXECUTION_RISK_PER_TRADE_PCT,
+            "max_concurrent_positions": config.EXECUTION_MAX_CONCURRENT_POSITIONS,
+            "daily_loss_limit_pct": config.EXECUTION_DAILY_LOSS_LIMIT_PCT,
+        }
+        if not config.EXECUTION_ENABLED:
+            return base
+        try:
+            from execution.risk import circuit_breaker
+            from execution.live_positions import live_position_book
+            live_prices = {sym: s.price for sym, s in self.symbols.items() if s.price > 0}
+            base["circuit_breaker"] = circuit_breaker.snapshot()
+            base["positions"] = live_position_book.snapshot(live_prices)
+        except Exception:
+            base["error"] = "execution status unavailable this tick"
+        return base
 
     async def broadcast(self) -> None:
         if not self.clients:

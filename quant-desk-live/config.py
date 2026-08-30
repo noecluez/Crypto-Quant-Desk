@@ -22,7 +22,9 @@ class Config:
     # the long/short account ratio, none of which exist on spot. "spot" still
     # works if you'd rather analyze the spot market, but the positioning
     # panels will simply report "not available on spot" rather than guess.
-    # NOTE: this app never places an order on either market -- see the README.
+    # NOTE: as of v8 (2026-08-30) this app CAN place real orders, on linear
+    # only, when EXECUTION_ENABLED=true -- see "LIVE EXECUTION" below and the
+    # README. Analysis and Tracker Positions work the same regardless.
     BYBIT_CATEGORY = os.getenv("BYBIT_CATEGORY", "linear").strip().lower()
 
     PORT = int(os.getenv("PORT", "8000"))
@@ -80,11 +82,127 @@ class Config:
     # Purely for framing the cost in leverage terms in the UI -- it does not
     # change any percentage, since a % return on notional is leverage-neutral.
     ASSUMED_LEVERAGE = float(os.getenv("ASSUMED_LEVERAGE", "10"))
+    # What fraction of account equity a single Tracker Position is assumed to
+    # use as margin. This app never allocates or holds real capital -- it's
+    # purely a sizing assumption applied uniformly across the whole closed
+    # track record so "cumulative P&L" can be shown as a % of account rather
+    # than a leverage-neutral price-move %. Combined with ASSUMED_LEVERAGE: a
+    # 2.5% net move on a position sized at 5% of account at 10x = 1.25% of
+    # account. Unlike cost_pct, this is not locked in per-trade -- it's a
+    # "what if I sized this way" framing choice, not a cost actually paid, so
+    # changing it recomputes the whole cumulative figure rather than only
+    # applying to new positions.
+    POSITION_SIZE_PCT = float(os.getenv("POSITION_SIZE_PCT", "5"))
+
+    # -----------------------------------------------------------------
+    # LIVE EXECUTION (Bybit futures) -- v8, 2026-08-30.
+    # Everything below this line is new: real API keys, real orders, real
+    # leverage. EXECUTION_ENABLED defaults to false so upgrading this app
+    # never silently starts trading -- it must be turned on explicitly.
+    # See README.md "Live execution" for the full safety model.
+    # -----------------------------------------------------------------
+    EXECUTION_ENABLED = os.getenv("EXECUTION_ENABLED", "false").lower() in ("1", "true", "yes")
+    # true = https://api-testnet.bybit.com (fake funds). false = real mainnet
+    # money. Get this working end-to-end on testnet first -- there is no
+    # supported path that skips it.
+    BYBIT_TESTNET = os.getenv("BYBIT_TESTNET", "true").lower() in ("1", "true", "yes")
+    BYBIT_API_KEY = os.getenv("BYBIT_API_KEY", "")
+    BYBIT_API_SECRET = os.getenv("BYBIT_API_SECRET", "")
+
+    # --- Risk limits (hard caps, enforced in execution/risk.py) ---
+    EXECUTION_MAX_LEVERAGE = float(os.getenv("EXECUTION_MAX_LEVERAGE", "10"))
+    EXECUTION_MIN_LEVERAGE = float(os.getenv("EXECUTION_MIN_LEVERAGE", "3"))
+    EXECUTION_RISK_PER_TRADE_PCT = float(os.getenv("EXECUTION_RISK_PER_TRADE_PCT", "2"))
+    EXECUTION_MAX_CONCURRENT_POSITIONS = int(os.getenv("EXECUTION_MAX_CONCURRENT_POSITIONS", "5"))
+    # % of account equity lost in a UTC day that halts all new entries. Never
+    # closes existing positions (their own SL/TP still protect them) -- only
+    # blocks opening new ones. Stays tripped until re-armed (UI button or
+    # POST /api/execution/rearm), even across a day boundary, so a bad night
+    # can't be "fixed" by simply waiting for the clock to roll over.
+    EXECUTION_DAILY_LOSS_LIMIT_PCT = float(os.getenv("EXECUTION_DAILY_LOSS_LIMIT_PCT", "10"))
+    # Minutes to wait before re-entering the same symbol after closing a
+    # position on it, win or lose -- stops immediate re-entry into the same
+    # whipsaw.
+    EXECUTION_SYMBOL_COOLDOWN_MINUTES = int(os.getenv("EXECUTION_SYMBOL_COOLDOWN_MINUTES", "30"))
+    # Always isolated margin per position -- one bad trade must never be able
+    # to draw down margin shared with any other position.
+    EXECUTION_MARGIN_MODE = "isolated"
+
+    # --- Entry gate (see execution/signal_gate.py) ---
+    # "Relatively good confluence into the direction of the bias" (the user's
+    # own framing, 2026-08-30): the watchlist's score_setup() direction must
+    # be a real bias (not "two-sided" -- that already means the RSI-extreme/
+    # divergence uncertainty gate is active, see analysis/indicators.py), AND
+    # the independent multi-timeframe confluence() read must agree with that
+    # direction, AND agree "well enough" per the two knobs below.
+    # Minimum agree/total timeframe ratio (e.g. 0.75 = at least 3 of 4).
+    EXECUTION_MIN_CONFLUENCE_RATIO = float(os.getenv("EXECUTION_MIN_CONFLUENCE_RATIO", "0.75"))
+    # Minimum |confluence score| (-1..1 scale from analysis.indicators.confluence()).
+    EXECUTION_MIN_CONFLUENCE_SCORE = float(os.getenv("EXECUTION_MIN_CONFLUENCE_SCORE", "0.35"))
+    # A signal-performance bucket (see execution/signal_gate.py) needs at
+    # least this many closed trades (paper + live combined) before its
+    # historical win-rate/return is trusted enough to block or downsize a
+    # trade. Below this, the bucket is treated as "no information" rather
+    # than "bad" -- 46 total paper trades exist as of 2026-08-30, so most
+    # fine-grained buckets don't clear this yet.
+    EXECUTION_MIN_BUCKET_N = int(os.getenv("EXECUTION_MIN_BUCKET_N", "10"))
+
+    # --- Stop loss / take profit placement (execution/order_manager.py) ---
+    # Hybrid: ATR sets the volatility-sane base distance; a nearby strong S/R
+    # level tightens or widens it. Stop = entry -+ SL_ATR_MULT * ATR(1h),
+    # unless a qualifying S/R level sits closer, per SL_SR_SNAP_MAX_PCT.
+    EXECUTION_SL_ATR_MULT = float(os.getenv("EXECUTION_SL_ATR_MULT", "1.5"))
+    EXECUTION_TP_ATR_MULT = float(os.getenv("EXECUTION_TP_ATR_MULT", "3.0"))
+    EXECUTION_MIN_REWARD_RISK = float(os.getenv("EXECUTION_MIN_REWARD_RISK", "2.0"))
+    # Only snap the stop to a support/resistance level if doing so keeps the
+    # stop within this much of the ATR-based distance either way (percent of
+    # entry price) -- prevents an S/R level that happens to be very close or
+    # very far away from producing a nonsensical stop.
+    EXECUTION_SL_SR_SNAP_MAX_PCT = float(os.getenv("EXECUTION_SL_SR_SNAP_MAX_PCT", "50"))
+    # Once a position reaches this many multiples of its own initial risk (R)
+    # in profit, the fixed stop loss is replaced with an exchange-native
+    # trailing stop (see order_manager.py's "handoff" -- deliberately never
+    # both at once, to avoid any ambiguity about which one the exchange
+    # honors first). The position stays protected by the fixed SL the whole
+    # time up to that point.
+    EXECUTION_TRAILING_ACTIVATE_R = float(os.getenv("EXECUTION_TRAILING_ACTIVATE_R", "1.0"))
+    EXECUTION_TRAILING_ATR_MULT = float(os.getenv("EXECUTION_TRAILING_ATR_MULT", "1.0"))
+
+    # --- Cost buffer (execution/costs.py) ---
+    # Added ON TOP of the existing round_trip_cost_pct (measured taker fee +
+    # slippage) for every execution decision -- the entry cost-viability
+    # check, and take-profit sizing. Pure safety margin so a real trade has
+    # to clear its true cost estimate *plus* this before it's judged
+    # profitable, absorbing fee-tier surprises, funding paid while holding,
+    # and slippage worse than SLIPPAGE_PCT assumes. Requested by the user
+    # 2026-08-30. Never applied to the paper Tracker Positions' own cost_pct
+    # (that stays exactly the analysis-honesty model it always was).
+    EXECUTION_EXTRA_COST_BUFFER_PCT = float(os.getenv("EXECUTION_EXTRA_COST_BUFFER_PCT", "0.3"))
+
+    # --- Reconciliation / monitoring loop cadence ---
+    EXECUTION_MONITOR_SECONDS = int(os.getenv("EXECUTION_MONITOR_SECONDS", "20"))
 
     @property
     def round_trip_cost_pct(self) -> float:
         """Entry + exit, fee + slippage on each side."""
         return 2 * (self.TAKER_FEE_PCT + self.SLIPPAGE_PCT)
+
+    @property
+    def execution_cost_pct(self) -> float:
+        """round_trip_cost_pct plus the extra safety buffer -- what
+        execution/signal_gate.py and order_manager.py actually gate and size
+        against. Kept separate from round_trip_cost_pct (used everywhere
+        else, including the paper Tracker Positions) rather than changing
+        that shared property, so the buffer only affects real orders."""
+        return self.round_trip_cost_pct + self.EXECUTION_EXTRA_COST_BUFFER_PCT
+
+    @property
+    def bybit_rest_base(self) -> str:
+        return "https://api-testnet.bybit.com" if self.BYBIT_TESTNET else "https://api.bybit.com"
+
+    @property
+    def execution_configured(self) -> bool:
+        return bool(self.BYBIT_API_KEY and self.BYBIT_API_SECRET)
 
     @property
     def is_derivatives(self) -> bool:

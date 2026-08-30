@@ -38,6 +38,8 @@ import uuid
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
 
+from analysis.costs import account_pnl_pct as _account_pnl_pct
+
 DEFAULT_PATH = Path(__file__).parent / "positions.json"
 
 
@@ -199,7 +201,7 @@ class PositionBook:
         self._save()
         return pos
 
-    def summary(self) -> dict:
+    def summary(self, position_size_pct: float = 0.0, leverage: float = 0.0) -> dict:
         closed = [p for p in self.positions.values() if p.status == "closed"]
         gross = [r for p in closed if (r := p.gross_pnl_pct()) is not None]
         net = [r for p in closed if (r := p.net_pnl_pct()) is not None]
@@ -207,6 +209,19 @@ class PositionBook:
         # Total cost drag paid across the whole track record -- the clearest
         # way to see how much of a gross edge is handed to the exchange.
         stats["total_cost_drag_pct"] = round(sum(p.cost_pct for p in closed), 3)
+        # Cumulative net P&L in account-equity terms, assuming every closed
+        # position used `position_size_pct`% of the account as margin at
+        # `leverage`x -- see analysis/costs.account_pnl_pct(). This is a
+        # simple (non-compounding) sum across trades, not a running balance:
+        # it doesn't try to model overlapping open positions or reinvested
+        # gains, just "add up what each trade would have done to a fixed-size
+        # slice of the account". Good enough to see whether the track record
+        # is actually additive, not precise enough to size real capital with.
+        stats["cumulative_pnl_account_pct"] = round(
+            sum(_account_pnl_pct(r, leverage, position_size_pct) for r in net), 3
+        ) if net else 0.0
+        stats["position_size_pct"] = position_size_pct
+        stats["leverage_assumed"] = leverage
         return stats
 
     def scorecard(self) -> dict:
@@ -254,7 +269,8 @@ class PositionBook:
         rows.sort(key=lambda r: (-r["count"], r["bucket"]))
         return {"rows": rows, "unattributed": unattributed}
 
-    def snapshot(self, live_prices: dict[str, float]) -> dict:
+    def snapshot(self, live_prices: dict[str, float],
+                 position_size_pct: float = 0.0, leverage: float = 0.0) -> dict:
         open_positions = sorted(
             (p.to_dict(live_prices.get(p.symbol)) for p in self.positions.values() if p.status == "open"),
             key=lambda d: d["entry_time"], reverse=True,
@@ -266,7 +282,7 @@ class PositionBook:
         return {
             "open": list(open_positions),
             "closed": closed_positions[:50],
-            "summary": self.summary(),
+            "summary": self.summary(position_size_pct, leverage),
             "scorecard": self.scorecard(),
         }
 

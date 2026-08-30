@@ -39,6 +39,19 @@ def _log_if_crashed(task: asyncio.Task) -> None:
 
 @app.on_event("startup")
 async def startup() -> None:
+    if config.EXECUTION_ENABLED:
+        # Runs before anything else touches execution -- reconciles this
+        # app's bookkeeping against whatever Bybit actually shows BEFORE the
+        # first deep-refresh cycle could try to open anything. Blocking here
+        # (not backgrounded) is deliberate: startup should not proceed to
+        # "live" status while it's unknown whether local state matches the
+        # exchange. See execution/order_manager.py's reconcile_on_startup.
+        from execution import engine as execution_engine
+        log.info("Execution enabled (%s) -- reconciling against Bybit before starting feeds",
+                  "TESTNET" if config.BYBIT_TESTNET else "MAINNET")
+        await asyncio.get_event_loop().run_in_executor(None, execution_engine.startup_reconcile, config)
+        _background_tasks.append(asyncio.create_task(execution_engine.monitor_loop(config), name="execution_monitor"))
+
     bybit_task = asyncio.create_task(bybit_feed.run(), name="bybit_feed")
     bybit_task.add_done_callback(_log_if_crashed)
     _background_tasks.append(bybit_task)
@@ -207,3 +220,70 @@ async def api_clear_spotlight() -> dict:
     bybit_feed.clear_spotlight()
     await state.broadcast()
     return {"status": "cleared"}
+
+
+# ---------------------------------------------------------------------------
+# Live execution -- kill switch, circuit breaker, emergency flatten
+# ---------------------------------------------------------------------------
+
+@app.get("/api/execution/status")
+async def api_execution_status() -> dict:
+    return state._execution_snapshot(config)
+
+
+@app.post("/api/execution/pause")
+async def api_execution_pause() -> dict:
+    """In-memory only for the life of this process -- does NOT edit .env.
+    A restart goes back to whatever EXECUTION_ENABLED is set to there. Does
+    NOT close any open positions; their own exchange-native SL/TP keep
+    protecting them. Use /api/execution/flatten for that."""
+    config.EXECUTION_ENABLED = False
+    log.warning("Execution PAUSED via API (new entries blocked; open positions untouched)")
+    state.log_alert("[Execution] Paused via UI -- no new entries until resumed")
+    await state.broadcast()
+    return {"enabled": config.EXECUTION_ENABLED}
+
+
+@app.post("/api/execution/resume")
+async def api_execution_resume() -> dict:
+    if not config.execution_configured:
+        raise HTTPException(400, "BYBIT_API_KEY / BYBIT_API_SECRET are not set -- cannot resume execution.")
+    config.EXECUTION_ENABLED = True
+    log.warning("Execution RESUMED via API")
+    state.log_alert("[Execution] Resumed via UI")
+    await state.broadcast()
+    return {"enabled": config.EXECUTION_ENABLED}
+
+
+@app.post("/api/execution/rearm")
+async def api_execution_rearm() -> dict:
+    """Clears a tripped daily-loss circuit breaker. Does not touch
+    EXECUTION_ENABLED -- if you also paused, you still need to resume
+    separately. Deliberately a distinct action from resume: pausing is a
+    manual "stop trading for now", re-arming is specifically clearing the
+    automated daily-loss halt so a human has to consciously do both if both
+    are active."""
+    from execution.risk import circuit_breaker
+    circuit_breaker.rearm()
+    log.warning("Circuit breaker RE-ARMED via API")
+    state.log_alert("[Execution] Circuit breaker re-armed")
+    await state.broadcast()
+    return circuit_breaker.snapshot()
+
+
+@app.post("/api/execution/flatten")
+async def api_execution_flatten() -> dict:
+    """Emergency stop: closes every open live position at market, right now,
+    and pauses execution (same effect as /pause) so nothing reopens
+    immediately after. Does not touch the daily circuit breaker's halted
+    state either way -- if the day's loss limit was already breached, it
+    stays breached; if not, flattening manually doesn't trip it by itself."""
+    if not config.execution_configured:
+        raise HTTPException(400, "BYBIT_API_KEY / BYBIT_API_SECRET are not set.")
+    from execution import order_manager
+    log.warning("FLATTEN ALL requested via API")
+    results = await asyncio.get_event_loop().run_in_executor(None, order_manager.flatten_all, config, "manual flatten via UI")
+    config.EXECUTION_ENABLED = False
+    state.log_alert(f"[Execution] FLATTEN ALL executed ({len(results)} position(s)) -- execution paused")
+    await state.broadcast()
+    return {"results": results, "enabled": config.EXECUTION_ENABLED}

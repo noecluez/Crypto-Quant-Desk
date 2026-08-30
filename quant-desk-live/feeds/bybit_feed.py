@@ -933,6 +933,19 @@ async def _deep_refresh_all() -> None:
 
     for sym in symbols:
         _recompute(sym)  # fold the freshly-updated deep fields into heat/tags/alerts right away
+
+    # Live execution (v8, 2026-08-30): evaluate every deep-watchlist symbol
+    # against the entry gate once per cycle, same cadence as everything else
+    # here. Deliberately NOT called from the fast tick path -- see
+    # execution/engine.py's evaluate_watchlist() docstring. A no-op unless
+    # EXECUTION_ENABLED=true.
+    if config.EXECUTION_ENABLED:
+        try:
+            from execution import engine as execution_engine
+            await asyncio.get_event_loop().run_in_executor(None, execution_engine.evaluate_watchlist, symbols, state.symbols, config)
+        except Exception:
+            log.warning("Execution watchlist evaluation failed this cycle (will retry next cycle)", exc_info=True)
+
     await state.broadcast()
 
 
